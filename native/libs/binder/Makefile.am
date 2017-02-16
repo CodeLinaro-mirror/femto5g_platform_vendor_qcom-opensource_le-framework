@@ -27,6 +27,7 @@ libbinder_la_SOURCES = $(common_sources)
 libbinder_la_CPPFLAGS := -I$(top_srcdir)/include
 libbinder_la_CPPFLAGS += -std=c++11 -DHAVE_PTHREADS -DHAVE_ANDROID_OS
 libbinder_la_CPPFLAGS += -DUSE_GLIB -D__linux__
+libbinder_la_CPPFLAGS += -DDEBUG_REFS_CALLSTACK_ENABLED=0
 libbinder_la_LDFLAGS := -llog -lcutils -lpthread -lutils
 
 # Build binder testapp
