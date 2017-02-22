@@ -577,7 +577,7 @@ bool Region::validate(const Region& reg, const char* name, bool silent)
     }
     if (result == false && !silent) {
         reg.dump(name);
-        CallStack stack(LOG_TAG);
+        //CallStack stack(LOG_TAG);
     }
     return result;
 }
