@@ -694,6 +694,7 @@ private:
     DefaultKeyedVector<String8,String8>    mMap;
 };
 
+void parseSizesList(const char *sizesStr, Vector<Size> &sizes);
 }; // namespace android
 
 #endif
