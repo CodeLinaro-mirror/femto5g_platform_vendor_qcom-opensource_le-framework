@@ -57,6 +57,16 @@ struct CryptoPlugin {
         uint32_t mNumBytesOfEncryptedData;
     };
 
+    struct Pattern {
+        // Number of blocks to be encrypted in the pattern. If zero, pattern
+        // encryption is inoperative.
+        uint32_t mEncryptBlocks;
+
+        // Number of blocks to be skipped (left clear) in the pattern. If zero,
+        // pattern encryption is inoperative.
+        uint32_t mSkipBlocks;
+    };
+
     CryptoPlugin() {}
     virtual ~CryptoPlugin() {}
 
@@ -96,6 +106,7 @@ struct CryptoPlugin {
             const uint8_t key[16],
             const uint8_t iv[16],
             Mode mode,
+            const Pattern &pattern,
             const void *srcPtr,
             const SubSample *subSamples, size_t numSubSamples,
             void *dstPtr,
