@@ -886,6 +886,8 @@ typedef enum {
     AUDIO_OUTPUT_FLAG_MAIN = 0x4000, // Flag for Main Input Stream
     AUDIO_OUTPUT_FLAG_ASSOCIATED = 0x8000, // Flag for Assocated Input Stream
     AUDIO_OUTPUT_FLAG_TIMESTAMP = 0x10000, // flag for Timestamp mode
+    AUDIO_OUTPUT_FLAG_BD10 = 0x20000, // flag for BD Use Case
+    AUDIO_OUTPUT_FLAG_INTERACTIVE = 0x40000, // flag for Interactive Stream
 } audio_output_flags_t;
 
 /* The audio input flags are analogous to audio output flags.
