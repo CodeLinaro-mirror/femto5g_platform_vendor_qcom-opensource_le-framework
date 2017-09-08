@@ -25,6 +25,13 @@ AS_CASE([$host],
 
 ARM=yes
 
+AC_ARG_ENABLE(32bit-binder-ipc,
+      AC_HELP_STRING([--enable-32bit-binder-ipc],
+        [enables IPC on 32bit kernel]),
+        [enable_32bit_ipc=${enableval}])
+
+AM_CONDITIONAL(IPC_32BIT, [test "x${enable_32bit_ipc}" = "xyes"])
+
 AC_ARG_WITH([core_includes],
       AC_HELP_STRING([--with-core-includes=@<:@dir@:>@],
          [Specify the location of the core headers]),
