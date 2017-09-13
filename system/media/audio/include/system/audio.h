@@ -540,6 +540,7 @@ enum {
                                AUDIO_CHANNEL_IN_BACK |
                                AUDIO_CHANNEL_IN_LEFT_PROCESSED |
                                AUDIO_CHANNEL_IN_RIGHT_PROCESSED),
+    AUDIO_CHANNEL_IN_6 = 252u,
     AUDIO_CHANNEL_IN_VOICE_UPLINK_MONO = (AUDIO_CHANNEL_IN_VOICE_UPLINK | AUDIO_CHANNEL_IN_MONO),
     AUDIO_CHANNEL_IN_VOICE_DNLINK_MONO = (AUDIO_CHANNEL_IN_VOICE_DNLINK | AUDIO_CHANNEL_IN_MONO),
     AUDIO_CHANNEL_IN_VOICE_CALL_MONO   = (AUDIO_CHANNEL_IN_VOICE_UPLINK_MONO | AUDIO_CHANNEL_IN_VOICE_DNLINK_MONO),
@@ -883,6 +884,7 @@ typedef enum {
                                          // start voip over voice path.
     AUDIO_OUTPUT_FLAG_COMPRESS_PASSTHROUGH = 0x1000, // flag for HDMI compressed passthrough
     AUDIO_OUTPUT_FLAG_DIRECT_PCM = 0x2000, // flag for Direct PCM
+    AUDIO_OUTPUT_FLAG_MMAP_NOIRQ = 16384, // 0x4000
     AUDIO_OUTPUT_FLAG_MAIN = 0x8000000, // Flag for Main Input Stream
     AUDIO_OUTPUT_FLAG_ASSOCIATED = 0x10000000, // Flag for Assocated Input Stream
     AUDIO_OUTPUT_FLAG_TIMESTAMP = 0x20000000, // flag for Timestamp mode
@@ -900,6 +902,7 @@ typedef enum {
     AUDIO_INPUT_FLAG_FAST       = 0x1,  // prefer an input that supports "fast tracks"
     AUDIO_INPUT_FLAG_HW_HOTWORD = 0x2,  // prefer an input that captures from hw hotword source
     AUDIO_INPUT_FLAG_RAW        = 0x4,  // minimize signal processing
+    AUDIO_INPUT_FLAG_MMAP_NOIRQ = 16, // 0x10
     AUDIO_INPUT_FLAG_SYNC       = 0x8,  // synchronize I/O streams
 
 } audio_input_flags_t;
@@ -940,7 +943,6 @@ typedef struct {
     uint32_t bitrate;      /* 320kbps to 512kbps */
 } audio_sbc_encoder_config;
 
-
 /* Information about BT APTX encoder configuration
  * This data is used between audio HAL module and
  * BT IPC library to configure DSP encoder
@@ -950,7 +952,6 @@ typedef struct {
     uint8_t  channels;
     uint32_t bitrate;
 } audio_aptx_encoder_config;
-
 
 /* Information about BT AAC encoder configuration
  * This data is used between audio HAL module and
@@ -1263,6 +1264,28 @@ typedef uint32_t audio_hw_sync_t;
 
 /* an invalid HW synchronization source indicating an error */
 #define AUDIO_HW_SYNC_INVALID 0
+
+/**
+ * Mmap buffer descriptor returned by audio_stream->create_mmap_buffer().
+ * note\ Used by streams opened in mmap mode.
+ */
+struct audio_mmap_buffer_info {
+    void*   shared_memory_address;  /**< base address of mmap memory buffer.
+                                         For use by local process only */
+    int32_t shared_memory_fd;       /**< FD for mmap memory buffer */
+    int32_t buffer_size_frames;     /**< total buffer size in frames */
+    int32_t burst_size_frames;      /**< transfer size granularity in frames */
+};
+
+/**
+ * Mmap buffer read/write position returned by audio_stream->get_mmap_position().
+ * note\ Used by streams opened in mmap mode.
+ */
+struct audio_mmap_position {
+    int64_t  time_nanoseconds; /**< timestamp in ns, CLOCK_MONOTONIC */
+    int32_t  position_frames;  /**< increasing 32 bit frame count reset when stream->stop()
+                                    is called */
+};
 
 static inline bool audio_is_output_device(audio_devices_t device)
 {
