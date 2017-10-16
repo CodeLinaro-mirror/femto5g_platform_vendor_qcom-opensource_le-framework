@@ -29,6 +29,11 @@ if test "x$with_core_includes" != "xno"; then
      AC_SUBST(core_incdir,${core_incdir})
 fi
 
+AC_ARG_WITH(kernel-headers,
+   AS_HELP_STRING([--with-kernel-headers=DIR],
+       [Specify the location of the Linux headers]),
+   [CPPFLAGS="$CPPFLAGS -idirafter $withval"])
+
 AC_ARG_WITH([glib],
       AC_HELP_STRING([--with-glib],
          [enable glib, building HLOS systems which use glib]))
