@@ -4,7 +4,6 @@ bin_PROGRAMS = mtpserver
 
 mtpserver_CPPFLAGS = -Wno-all -Wno-error -Wno-unused-parameter -g -O2
 mtpserver_CPPFLAGS += -I$(top_srcdir)/media/mtp
-mtpserver_CPPFLAGS += -I$(WORKSPACE)/system/core/include
 mtpserver_CPPFLAGS += -DMTP_DEVICE
 mtpserver_CPPFLAGS += -DLINUX_ENABLED
 mtpserver_CPPFLAGS += -DHAVE_PTHREADS
