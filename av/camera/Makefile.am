@@ -8,7 +8,6 @@ libcamera_client_la_SOURCES += VendorTagDescriptor.cpp
 
 libcamera_client_la_CPPFLAGS := -I$(top_srcdir)/include
 libcamera_client_la_CPPFLAGS += -std=c++11
-libcamera_client_la_CPPFLAGS += -I$(WORKSPACE)/system/media/private/camera/include
 libcamera_client_la_LDFLAGS  := -lutils -lcamera_metadata
 
 # Export headers

@@ -12,3 +12,6 @@ camera_metadata_includedir=$(includedir)/system
 camera_metadata_include_HEADERS := $(top_srcdir)/camera/include/system/camera_metadata.h
 camera_metadata_include_HEADERS += $(top_srcdir)/camera/include/system/camera_metadata_tags.h
 camera_metadata_include_HEADERS += $(top_srcdir)/camera/include/system/camera_vendor_tags.h
+
+camera_metadata_private_includedir=$(includedir)/camera
+camera_metadata_private_include_HEADERS := $(top_srcdir)/private/camera/include/camera_metadata_hidden.h
