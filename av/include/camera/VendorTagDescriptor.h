@@ -38,6 +38,12 @@ class VendorTagDescriptor
     public:
         virtual ~VendorTagDescriptor();
 
+        VendorTagDescriptor();
+        VendorTagDescriptor(const VendorTagDescriptor& src);
+        VendorTagDescriptor& operator=(const VendorTagDescriptor& rhs);
+
+        void copyFrom(const VendorTagDescriptor& src);
+
         /**
          * The following 'get*' methods implement the corresponding
          * functions defined in
@@ -98,6 +104,13 @@ class VendorTagDescriptor
                 sp<VendorTagDescriptor>& descriptor);
 
         /**
+         * Read values VendorTagDescriptor object from the given parcel.
+         *
+         * Returns OK on success, or a negative error code.
+         */
+        virtual status_t readFromParcel(const android::Parcel* parcel);
+
+        /**
          * Create a VendorTagDescriptor object from the given vendor_tag_ops_t
          * struct.
          *
@@ -127,7 +140,6 @@ class VendorTagDescriptor
          */
         static sp<VendorTagDescriptor> getGlobalVendorTagDescriptor();
     protected:
-        VendorTagDescriptor();
         KeyedVector<String8, KeyedVector<String8, uint32_t>*> mReverseMapping;
         KeyedVector<uint32_t, String8> mTagToNameMap;
         KeyedVector<uint32_t, uint32_t> mTagToSectionMap; // Value is offset in mSections
