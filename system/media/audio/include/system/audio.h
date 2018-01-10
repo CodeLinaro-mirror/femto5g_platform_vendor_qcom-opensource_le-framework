@@ -748,6 +748,7 @@ enum {
     /* audio bus implemented by the audio system (e.g an MOST stereo channel) */
     AUDIO_DEVICE_OUT_BUS                       = 0x1000000,
     AUDIO_DEVICE_OUT_PROXY                     = 0x2000000,
+    AUDIO_DEVICE_OUT_USB_HEADSET               = 0x4000000,
     AUDIO_DEVICE_OUT_DEFAULT                   = AUDIO_DEVICE_BIT_DEFAULT,
     AUDIO_DEVICE_OUT_ALL      = (AUDIO_DEVICE_OUT_EARPIECE |
                                  AUDIO_DEVICE_OUT_SPEAKER |
@@ -764,6 +765,7 @@ enum {
                                  AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET |
                                  AUDIO_DEVICE_OUT_USB_ACCESSORY |
                                  AUDIO_DEVICE_OUT_USB_DEVICE |
+                                 AUDIO_DEVICE_OUT_USB_HEADSET |
                                  AUDIO_DEVICE_OUT_REMOTE_SUBMIX |
                                  AUDIO_DEVICE_OUT_TELEPHONY_TX |
                                  AUDIO_DEVICE_OUT_LINE |
@@ -783,7 +785,8 @@ enum {
                                  AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET |
                                  AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT),
     AUDIO_DEVICE_OUT_ALL_USB  = (AUDIO_DEVICE_OUT_USB_ACCESSORY |
-                                 AUDIO_DEVICE_OUT_USB_DEVICE),
+                                 AUDIO_DEVICE_OUT_USB_DEVICE |
+                                 AUDIO_DEVICE_OUT_USB_HEADSET),
     /* input devices */
     AUDIO_DEVICE_IN_COMMUNICATION         = AUDIO_DEVICE_BIT_IN | 0x1,
     AUDIO_DEVICE_IN_AMBIENT               = AUDIO_DEVICE_BIT_IN | 0x2,
@@ -815,6 +818,7 @@ enum {
     /* audio bus implemented by the audio system (e.g an MOST stereo channel) */
     AUDIO_DEVICE_IN_BUS                   = AUDIO_DEVICE_BIT_IN | 0x100000,
     AUDIO_DEVICE_IN_PROXY                 = AUDIO_DEVICE_BIT_IN | 0x1000000,
+    AUDIO_DEVICE_IN_USB_HEADSET           = AUDIO_DEVICE_BIT_IN | 0x2000000,
     AUDIO_DEVICE_IN_DEFAULT               = AUDIO_DEVICE_BIT_IN | AUDIO_DEVICE_BIT_DEFAULT,
 
     AUDIO_DEVICE_IN_ALL     = (AUDIO_DEVICE_IN_COMMUNICATION |
@@ -830,6 +834,7 @@ enum {
                                AUDIO_DEVICE_IN_DGTL_DOCK_HEADSET |
                                AUDIO_DEVICE_IN_USB_ACCESSORY |
                                AUDIO_DEVICE_IN_USB_DEVICE |
+                               AUDIO_DEVICE_IN_USB_HEADSET |
                                AUDIO_DEVICE_IN_FM_TUNER |
                                AUDIO_DEVICE_IN_TV_TUNER |
                                AUDIO_DEVICE_IN_LINE |
@@ -842,7 +847,8 @@ enum {
                                AUDIO_DEVICE_IN_DEFAULT),
     AUDIO_DEVICE_IN_ALL_SCO = AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET,
     AUDIO_DEVICE_IN_ALL_USB  = (AUDIO_DEVICE_IN_USB_ACCESSORY |
-                                AUDIO_DEVICE_IN_USB_DEVICE),
+                                AUDIO_DEVICE_IN_USB_DEVICE |
+                                AUDIO_DEVICE_IN_USB_HEADSET),
 };
 
 typedef uint32_t audio_devices_t;
