@@ -46,7 +46,44 @@ static int vendor_tag_descriptor_get_tag_type(const vendor_tag_ops_t* v, uint32_
 static Mutex sLock;
 static sp<VendorTagDescriptor> sGlobalVendorTagDescriptor;
 
-VendorTagDescriptor::VendorTagDescriptor() {}
+VendorTagDescriptor::VendorTagDescriptor() :
+        mTagCount(0),
+        mVendorOps() {
+}
+
+VendorTagDescriptor::VendorTagDescriptor(const VendorTagDescriptor& src) {
+    copyFrom(src);
+}
+
+VendorTagDescriptor& VendorTagDescriptor::operator=(const VendorTagDescriptor& rhs) {
+    copyFrom(rhs);
+    return *this;
+}
+
+void VendorTagDescriptor::copyFrom(const VendorTagDescriptor& src) {
+    if (this == &src) return;
+
+    size_t len = mReverseMapping.size();
+    for (size_t i = 0; i < len; ++i) {
+        delete mReverseMapping[i];
+    }
+    mReverseMapping.clear();
+
+    len = src.mReverseMapping.size();
+    // Have to copy KeyedVectors inside mReverseMapping
+    for (size_t i = 0; i < len; ++i) {
+        KeyedVector<String8, uint32_t>* nameMapper = new KeyedVector<String8, uint32_t>();
+        *nameMapper = *(src.mReverseMapping.valueAt(i));
+        mReverseMapping.add(src.mReverseMapping.keyAt(i), nameMapper);
+    }
+    // Everything else is simple
+    mTagToNameMap = src.mTagToNameMap;
+    mTagToSectionMap = src.mTagToSectionMap;
+    mTagToTypeMap = src.mTagToTypeMap;
+    mSections = src.mSections;
+    mTagCount = src.mTagCount;
+    mVendorOps = src.mVendorOps;
+}
 
 VendorTagDescriptor::~VendorTagDescriptor() {
     size_t len = mReverseMapping.size();
@@ -246,6 +283,115 @@ status_t VendorTagDescriptor::createFromParcel(const Parcel* parcel,
     }
 
     descriptor = desc;
+    return res;
+}
+
+status_t VendorTagDescriptor::readFromParcel(const Parcel* parcel) {
+    status_t res = OK;
+    if (parcel == NULL) {
+        ALOGE("%s: parcel argument was NULL.", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    int32_t tagCount = 0;
+    if ((res = parcel->readInt32(&tagCount)) != OK) {
+        ALOGE("%s: could not read tag count from parcel", __FUNCTION__);
+        return res;
+    }
+
+    if (tagCount < 0 || tagCount > INT32_MAX) {
+        ALOGE("%s: tag count %d from vendor ops is invalid.", __FUNCTION__, tagCount);
+        return BAD_VALUE;
+    }
+
+    mTagCount = tagCount;
+
+    uint32_t tag, sectionIndex;
+    uint32_t maxSectionIndex = 0;
+    int32_t tagType;
+    Vector<uint32_t> allTags;
+    for (int32_t i = 0; i < tagCount; ++i) {
+        if ((res = parcel->readInt32(reinterpret_cast<int32_t*>(&tag))) != OK) {
+            ALOGE("%s: could not read tag id from parcel for index %d", __FUNCTION__, i);
+            break;
+        }
+        if (tag < CAMERA_METADATA_VENDOR_TAG_BOUNDARY) {
+            ALOGE("%s: vendor tag %d not in vendor tag section.", __FUNCTION__, tag);
+            res = BAD_VALUE;
+            break;
+        }
+        if ((res = parcel->readInt32(&tagType)) != OK) {
+            ALOGE("%s: could not read tag type from parcel for tag %d", __FUNCTION__, tag);
+            break;
+        }
+        if (tagType < 0 || tagType >= NUM_TYPES) {
+            ALOGE("%s: tag type %d from vendor ops does not exist.", __FUNCTION__, tagType);
+            res = BAD_VALUE;
+            break;
+        }
+        String8 tagName = parcel->readString8();
+        if (tagName.isEmpty()) {
+            ALOGE("%s: parcel tag name was NULL for tag %d.", __FUNCTION__, tag);
+            res = NOT_ENOUGH_DATA;
+            break;
+        }
+
+        if ((res = parcel->readInt32(reinterpret_cast<int32_t*>(&sectionIndex))) != OK) {
+            ALOGE("%s: could not read section index for tag %d.", __FUNCTION__, tag);
+            break;
+        }
+
+        maxSectionIndex = (maxSectionIndex >= sectionIndex) ? maxSectionIndex : sectionIndex;
+
+        allTags.add(tag);
+        mTagToNameMap.add(tag, tagName);
+        mTagToSectionMap.add(tag, sectionIndex);
+        mTagToTypeMap.add(tag, tagType);
+    }
+
+    if (res != OK) {
+        return res;
+    }
+
+    size_t sectionCount = 0;
+    if (tagCount > 0) {
+        if ((res = parcel->readInt32(reinterpret_cast<int32_t*>(&sectionCount))) != OK) {
+            ALOGE("%s: could not read section count for.", __FUNCTION__);
+            return res;
+        }
+        if (sectionCount < (maxSectionIndex + 1)) {
+            ALOGE("%s: Incorrect number of sections defined, received %zu, needs %d.",
+                    __FUNCTION__, sectionCount, (maxSectionIndex + 1));
+            return BAD_VALUE;
+        }
+        LOG_ALWAYS_FATAL_IF(mSections.setCapacity(sectionCount) <= 0,
+                "Vector capacity must be positive");
+        for (size_t i = 0; i < sectionCount; ++i) {
+            String8 sectionName = parcel->readString8();
+            if (sectionName.isEmpty()) {
+                ALOGE("%s: parcel section name was NULL for section %zu.",
+                      __FUNCTION__, i);
+                return NOT_ENOUGH_DATA;
+            }
+            mSections.add(sectionName);
+        }
+    }
+
+    LOG_ALWAYS_FATAL_IF(static_cast<size_t>(tagCount) != allTags.size(),
+                        "tagCount must be the same as allTags size");
+    // Set up reverse mapping
+    for (size_t i = 0; i < static_cast<size_t>(tagCount); ++i) {
+        uint32_t tag = allTags[i];
+        const String8& sectionString = mSections[mTagToSectionMap.valueFor(tag)];
+
+        ssize_t reverseIndex = -1;
+        if ((reverseIndex = mReverseMapping.indexOfKey(sectionString)) < 0) {
+            KeyedVector<String8, uint32_t>* nameMapper = new KeyedVector<String8, uint32_t>();
+            reverseIndex = mReverseMapping.add(sectionString, nameMapper);
+        }
+        mReverseMapping[reverseIndex]->add(mTagToNameMap.valueFor(tag), tag);
+    }
+
     return res;
 }
 
