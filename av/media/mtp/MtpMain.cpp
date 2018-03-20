@@ -978,7 +978,7 @@ MtpProperty* MyMtpDatabase::getDevicePropertyDesc(MtpDeviceProperty property)
         case MTP_DEVICE_PROPERTY_SYNCHRONIZATION_PARTNER:
         case MTP_DEVICE_PROPERTY_DEVICE_FRIENDLY_NAME:
             result = new MtpProperty(property, MTP_TYPE_STR, true);
-            result->setCurrentValue(str.string());
+            result->setCurrentValue((const uint16_t*)str.string());
             break;
         default:
             break;
