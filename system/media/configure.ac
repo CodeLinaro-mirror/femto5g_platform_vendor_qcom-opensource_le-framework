@@ -65,7 +65,6 @@ AC_SUBST([LIBS])
 
 AC_CONFIG_FILES([ \
         Makefile \
-        camera/src/Makefile \
         audio_route/Makefile \
         audio_route/audio_route.pc \
         audio_utils/Makefile \
