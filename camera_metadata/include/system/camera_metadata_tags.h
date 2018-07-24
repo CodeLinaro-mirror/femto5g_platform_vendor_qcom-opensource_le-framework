@@ -158,6 +158,9 @@ typedef enum camera_metadata_tag {
     ANDROID_CONTROL_AE_LOCK_AVAILABLE,                // enum         | public
     ANDROID_CONTROL_AWB_LOCK_AVAILABLE,               // enum         | public
     ANDROID_CONTROL_AVAILABLE_MODES,                  // byte[]       | public
+    ANDROID_CONTROL_POST_RAW_SENSITIVITY_BOOST_RANGE, // int32[]      | public
+    ANDROID_CONTROL_POST_RAW_SENSITIVITY_BOOST,       // int32        | public
+    ANDROID_CONTROL_ENABLE_ZSL,                       // enum         | public
     ANDROID_CONTROL_END,
 
     ANDROID_DEMOSAIC_MODE =                           // enum         | system
@@ -307,6 +310,10 @@ typedef enum camera_metadata_tag {
     ANDROID_SENSOR_TEST_PATTERN_MODE,                 // enum         | public
     ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES,      // int32[]      | public
     ANDROID_SENSOR_ROLLING_SHUTTER_SKEW,              // int64        | public
+    ANDROID_SENSOR_OPTICAL_BLACK_REGIONS,             // int32[]      | public
+    ANDROID_SENSOR_DYNAMIC_BLACK_LEVEL,               // float[]      | public
+    ANDROID_SENSOR_DYNAMIC_WHITE_LEVEL,               // int32        | public
+    ANDROID_SENSOR_OPAQUE_RAW_SIZE,                   // int32[]      | system
     ANDROID_SENSOR_END,
 
     ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE =           // int32[]      | public
@@ -548,6 +555,8 @@ typedef enum camera_metadata_enum_android_control_scene_mode {
     ANDROID_CONTROL_SCENE_MODE_HIGH_SPEED_VIDEO,
     ANDROID_CONTROL_SCENE_MODE_HDR,
     ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY_LOW_LIGHT,
+    ANDROID_CONTROL_SCENE_MODE_DEVICE_CUSTOM_START              = 100,
+    ANDROID_CONTROL_SCENE_MODE_DEVICE_CUSTOM_END                = 127,
 } camera_metadata_enum_android_control_scene_mode_t;
 
 // ANDROID_CONTROL_VIDEO_STABILIZATION_MODE
@@ -596,6 +605,12 @@ typedef enum camera_metadata_enum_android_control_awb_lock_available {
     ANDROID_CONTROL_AWB_LOCK_AVAILABLE_FALSE,
     ANDROID_CONTROL_AWB_LOCK_AVAILABLE_TRUE,
 } camera_metadata_enum_android_control_awb_lock_available_t;
+
+// ANDROID_CONTROL_ENABLE_ZSL
+typedef enum camera_metadata_enum_android_control_enable_zsl {
+    ANDROID_CONTROL_ENABLE_ZSL_FALSE,
+    ANDROID_CONTROL_ENABLE_ZSL_TRUE,
+} camera_metadata_enum_android_control_enable_zsl_t;
 
 
 // ANDROID_DEMOSAIC_MODE
@@ -880,6 +895,7 @@ typedef enum camera_metadata_enum_android_info_supported_hardware_level {
     ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED,
     ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_FULL,
     ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY,
+    ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_3,
 } camera_metadata_enum_android_info_supported_hardware_level_t;
 
 
