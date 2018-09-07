@@ -492,6 +492,18 @@ enum {
                                   AUDIO_CHANNEL_OUT_BACK_RIGHT |
                                   AUDIO_CHANNEL_OUT_SIDE_LEFT |
                                   AUDIO_CHANNEL_OUT_SIDE_RIGHT),
+    // matches the correct AudioFormat.CHANNEL_OUT_7POINT1_SURROUND definition for 7.1.4
+    AUDIO_CHANNEL_OUT_7POINT1POINT4  = (AUDIO_CHANNEL_OUT_7POINT1 |
+                                  AUDIO_CHANNEL_OUT_TOP_FRONT_LEFT |
+                                  AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT |
+                                  AUDIO_CHANNEL_OUT_TOP_BACK_LEFT |
+                                  AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT),
+    // matches the correct AudioFormat.CHANNEL_OUT_9POINT1_SURROUND definition for 9.1.6
+    AUDIO_CHANNEL_OUT_9POINT1POINT6  = (AUDIO_CHANNEL_OUT_7POINT1POINT4 |
+                                  AUDIO_CHANNEL_OUT_FRONT_LEFT_OF_CENTER |
+                                  AUDIO_CHANNEL_OUT_FRONT_RIGHT_OF_CENTER |
+                                  AUDIO_CHANNEL_OUT_TOP_FRONT_CENTER |
+                                  AUDIO_CHANNEL_OUT_TOP_BACK_CENTER),
     AUDIO_CHANNEL_OUT_ALL      = (AUDIO_CHANNEL_OUT_FRONT_LEFT |
                                   AUDIO_CHANNEL_OUT_FRONT_RIGHT |
                                   AUDIO_CHANNEL_OUT_FRONT_CENTER |
@@ -620,6 +632,14 @@ enum {
     AUDIO_CHANNEL_INDEX_MASK_6 =  AUDIO_CHANNEL_INDEX_HDR | ((1 << 6) - 1),
     AUDIO_CHANNEL_INDEX_MASK_7 =  AUDIO_CHANNEL_INDEX_HDR | ((1 << 7) - 1),
     AUDIO_CHANNEL_INDEX_MASK_8 =  AUDIO_CHANNEL_INDEX_HDR | ((1 << 8) - 1),
+    AUDIO_CHANNEL_INDEX_MASK_9 =  AUDIO_CHANNEL_INDEX_HDR | ((1 << 9) - 1),
+    AUDIO_CHANNEL_INDEX_MASK_10 =  AUDIO_CHANNEL_INDEX_HDR | ((1 << 10) - 1),
+    AUDIO_CHANNEL_INDEX_MASK_11 =  AUDIO_CHANNEL_INDEX_HDR | ((1 << 11) - 1),
+    AUDIO_CHANNEL_INDEX_MASK_12 =  AUDIO_CHANNEL_INDEX_HDR | ((1 << 12) - 1),
+    AUDIO_CHANNEL_INDEX_MASK_13 =  AUDIO_CHANNEL_INDEX_HDR | ((1 << 13) - 1),
+    AUDIO_CHANNEL_INDEX_MASK_14 =  AUDIO_CHANNEL_INDEX_HDR | ((1 << 14) - 1),
+    AUDIO_CHANNEL_INDEX_MASK_15 =  AUDIO_CHANNEL_INDEX_HDR | ((1 << 15) - 1),
+    AUDIO_CHANNEL_INDEX_MASK_16 =  AUDIO_CHANNEL_INDEX_HDR | ((1 << 16) - 1),
     // FIXME FCC_8
 };
 
@@ -1531,8 +1551,14 @@ static inline audio_channel_mask_t audio_channel_out_mask_from_count(uint32_t ch
     case 7: // 6.1
         bits = AUDIO_CHANNEL_OUT_5POINT1 | AUDIO_CHANNEL_OUT_BACK_CENTER;
         break;
-    case 8:
+    case 8: // 7.1
         bits = AUDIO_CHANNEL_OUT_7POINT1;
+        break;
+    case 12: // 7.1.4
+        bits = AUDIO_CHANNEL_OUT_7POINT1POINT4;
+        break;
+    case 16: // 9.1.6
+        bits = AUDIO_CHANNEL_OUT_9POINT1POINT6;
         break;
     // FIXME FCC_8
     default:
