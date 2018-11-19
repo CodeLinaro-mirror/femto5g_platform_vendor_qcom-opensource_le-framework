@@ -26,6 +26,10 @@
 
 #include <cutils/bitops.h>
 
+#ifndef FLT_MAX
+#include <float.h>
+#endif
+
 __BEGIN_DECLS
 
 /* The macro FCC_2 highlights places where there are 2-channel assumptions.
@@ -437,6 +441,8 @@ enum {
     AUDIO_CHANNEL_OUT_TOP_BACK_LEFT         = 0x8000,
     AUDIO_CHANNEL_OUT_TOP_BACK_CENTER       = 0x10000,
     AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT        = 0x20000,
+    AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT         = 0x40000u,
+    AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT        = 0x80000u,
 
 /* TODO: should these be considered complete channel masks, or only bits? */
 
@@ -476,6 +482,9 @@ enum {
                                   AUDIO_CHANNEL_OUT_LOW_FREQUENCY |
                                   AUDIO_CHANNEL_OUT_SIDE_LEFT |
                                   AUDIO_CHANNEL_OUT_SIDE_RIGHT),
+    AUDIO_CHANNEL_OUT_5POINT1POINT2 = (AUDIO_CHANNEL_OUT_5POINT1 |
+                                       AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT |
+                                       AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT),
     AUDIO_CHANNEL_OUT_6POINT1  = (AUDIO_CHANNEL_OUT_FRONT_LEFT |
                                   AUDIO_CHANNEL_OUT_FRONT_RIGHT |
                                   AUDIO_CHANNEL_OUT_FRONT_CENTER |
@@ -840,6 +849,7 @@ enum {
     AUDIO_DEVICE_IN_PROXY                 = AUDIO_DEVICE_BIT_IN | 0x1000000,
     AUDIO_DEVICE_IN_USB_HEADSET           = AUDIO_DEVICE_BIT_IN | 0x2000000,
     AUDIO_DEVICE_IN_HDMI_ARC              = AUDIO_DEVICE_BIT_IN | 0x8000000,
+    AUDIO_DEVICE_IN_BLUETOOTH_BLE         = AUDIO_DEVICE_BIT_IN | 0x4000000,
     AUDIO_DEVICE_IN_DEFAULT               = AUDIO_DEVICE_BIT_IN | AUDIO_DEVICE_BIT_DEFAULT,
 
     AUDIO_DEVICE_IN_ALL     = (AUDIO_DEVICE_IN_COMMUNICATION |
@@ -969,6 +979,7 @@ typedef struct {
     uint8_t  min_bitpool;   /* 2 */
     uint8_t  max_bitpool;   /*53(44.1khz),51 (48khz) */
     uint32_t bitrate;      /* 320kbps to 512kbps */
+    uint32_t bits_per_sample;
 } audio_sbc_encoder_config;
 
 /* Information about BT APTX encoder configuration
@@ -979,6 +990,7 @@ typedef struct {
     uint16_t sampling_rate;
     uint8_t  channels;
     uint32_t bitrate;
+    uint32_t bits_per_sample;
 } audio_aptx_encoder_config;
 
 /* Information about BT AAC encoder configuration
@@ -991,6 +1003,7 @@ typedef struct {
     uint16_t channels; /* 1-Mono, 2-Stereo */
     uint32_t sampling_rate;
     uint32_t bitrate;
+    uint32_t bits_per_sample;
 } audio_aac_encoder_config;
 
 #define AUDIO_MAKE_OFFLOAD_INFO_VERSION(maj,min) \
@@ -1758,6 +1771,82 @@ static inline bool audio_device_is_digital(audio_devices_t device) {
                           AUDIO_DEVICE_OUT_BUS)) != 0;
     }
 }
+
+typedef enum {
+    AUDIO_MICROPHONE_DIRECTIONALITY_UNKNOWN = 0,
+    AUDIO_MICROPHONE_DIRECTIONALITY_OMNI = 1,
+    AUDIO_MICROPHONE_DIRECTIONALITY_BI_DIRECTIONAL = 2,
+    AUDIO_MICROPHONE_DIRECTIONALITY_CARDIOID = 3,
+    AUDIO_MICROPHONE_DIRECTIONALITY_HYPER_CARDIOID = 4,
+    AUDIO_MICROPHONE_DIRECTIONALITY_SUPER_CARDIOID = 5,
+    AUDIO_MICROPHONE_DIRECTIONALITY_CNT = 6,
+} audio_microphone_directionality_t;
+
+/* A 3D point which could be used to represent geometric location
+ * or orientation of a microphone.
+ */
+struct audio_microphone_coordinate {
+    float x;
+    float y;
+    float z;
+};
+
+typedef enum {
+    AUDIO_MICROPHONE_LOCATION_UNKNOWN = 0,
+    AUDIO_MICROPHONE_LOCATION_MAINBODY = 1,
+    AUDIO_MICROPHONE_LOCATION_MAINBODY_MOVABLE = 2,
+    AUDIO_MICROPHONE_LOCATION_PERIPHERAL = 3,
+    AUDIO_MICROPHONE_LOCATION_CNT = 4,
+} audio_microphone_location_t;
+
+/* An number to indicate which group the microphone locate. Main body is
+ * usually group 0. Developer could use this value to group the microphones
+ * that locate on the same peripheral or attachments.
+ */
+typedef int audio_microphone_group_t;
+
+typedef enum {
+    AUDIO_MICROPHONE_CHANNEL_MAPPING_UNUSED = 0,
+    AUDIO_MICROPHONE_CHANNEL_MAPPING_DIRECT = 1,
+    AUDIO_MICROPHONE_CHANNEL_MAPPING_PROCESSED = 2,
+    AUDIO_MICROPHONE_CHANNEL_MAPPING_CNT = 3,
+}  audio_microphone_channel_mapping_t;
+
+/* the maximum length for the microphone id */
+#define AUDIO_MICROPHONE_ID_MAX_LEN 32
+/* max number of frequency responses in a frequency response table */
+#define AUDIO_MICROPHONE_MAX_FREQUENCY_RESPONSES 256
+/* max number of microphone */
+#define AUDIO_MICROPHONE_MAX_COUNT 32
+/* the value of unknown spl */
+#define AUDIO_MICROPHONE_SPL_UNKNOWN -FLT_MAX
+/* the value of unknown sensitivity */
+#define AUDIO_MICROPHONE_SENSITIVITY_UNKNOWN -FLT_MAX
+/* the value of unknown coordinate */
+#define AUDIO_MICROPHONE_COORDINATE_UNKNOWN -FLT_MAX
+/* the value used as address when the address of bottom microphone is empty */
+#define AUDIO_BOTTOM_MICROPHONE_ADDRESS "bottom"
+/* the value used as address when the address of back microphone is empty */
+#define AUDIO_BACK_MICROPHONE_ADDRESS "back"
+
+struct audio_microphone_characteristic_t {
+    char                               device_id[AUDIO_MICROPHONE_ID_MAX_LEN];
+    audio_port_handle_t                id;
+    audio_devices_t                    device;
+    char                               address[AUDIO_DEVICE_MAX_ADDRESS_LEN];
+    audio_microphone_channel_mapping_t channel_mapping[AUDIO_CHANNEL_COUNT_MAX];
+    audio_microphone_location_t        location;
+    audio_microphone_group_t           group;
+    unsigned int                       index_in_the_group;
+    float                              sensitivity;
+    float                              max_spl;
+    float                              min_spl;
+    audio_microphone_directionality_t  directionality;
+    unsigned int                       num_frequency_responses;
+    float frequency_responses[2][AUDIO_MICROPHONE_MAX_FREQUENCY_RESPONSES];
+    struct audio_microphone_coordinate geometric_location;
+    struct audio_microphone_coordinate orientation;
+};
 
 __END_DECLS
 
