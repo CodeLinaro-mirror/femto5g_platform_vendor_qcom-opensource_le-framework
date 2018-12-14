@@ -36,6 +36,7 @@
 #include "MtpServer.h"
 #include "MtpStorage.h"
 #include "MtpStringBuffer.h"
+#include "MtpGoPro.h"
 
 #include <linux/usb/f_mtp.h>
 
@@ -143,6 +144,18 @@ MtpStorage* MtpServer::getStorage(MtpStorageID id) {
         MtpStorage* storage = mStorages[i];
         if (storage->getStorageID() == id)
             return storage;
+    }
+    return NULL;
+}
+/* Currently one storage is supported at a time and index 0 should have the storage
+ * If multiple storages are supported then this should be modified accordingly
+ * MAC uses Model name to show on the folder header when used from android mtp manager
+ * This is temporary fix till MAC PTP is supported
+ */
+const char* MtpServer::getDeviceName() {
+    if (mStorages.size() > 0)
+    {
+        return mStorages[0]->getDeviceName();
     }
     return NULL;
 }
@@ -442,7 +455,7 @@ MtpResponseCode MtpServer::doGetDeviceInfo() {
 
     MtpObjectFormatList* playbackFormats = mDatabase->getSupportedPlaybackFormats();
     MtpObjectFormatList* captureFormats = mDatabase->getSupportedCaptureFormats();
-    MtpDevicePropertyList* deviceProperties = mDatabase->getSupportedDeviceProperties();
+    MtpDevicePropertyList* deviceProperties = mDatabase->getSupportedDeviceProperties();    
 
     // fill in device info
     mData.putUInt16(MTP_STANDARD_VERSION);
@@ -470,18 +483,13 @@ MtpResponseCode MtpServer::doGetDeviceInfo() {
     mData.putAUInt16(captureFormats); // Capture Formats
     mData.putAUInt16(playbackFormats);  // Playback Formats
 
-    property_get("ro.product.manufacturer", prop_value, "unknown manufacturer");
-    string.set(prop_value);
+    string.set(GOPRO_MANUFACTURER_NAME);
     mData.putString(string);   // Manufacturer
-
-    property_get("ro.product.model", prop_value, "MTP Device");
-    string.set(prop_value);
+    string.set(getDeviceName());
     mData.putString(string);   // Model
-    string.set("1.0");
+    string.set(GOPRO_DEVICE_VERSION);
     mData.putString(string);   // Device Version
-
-    property_get("ro.serialno", prop_value, "????????");
-    string.set(prop_value);
+    string.set(GOPRO_DEVICE_SERIAL_NUMBER);
     mData.putString(string);   // Serial Number
 
     delete playbackFormats;

@@ -41,16 +41,19 @@
 #include "MtpProperty.h"
 #include "MtpDebug.h"
 #include "MtpTypes.h"
+#include "MtpGoPro.h"
 
 #include <map>
 #include <stdexcept>
 
 #define EXTERNAL_STORAGE_PATH "/mnt/sdcard"
-#define EXTERNAL_STORAGE_DESC "sdcard"
-#define INTERNAL_STORAGE_PATH "/media/internal"
-#define INTERNAL_STORAGE_DESC "Internal storage"
-#define DEVICE_FRIENDLY_NAME "MTP"
+/* External drive name also uses the same drive name as internal storage */
+#define EXTERNAL_STORAGE_DESC GOPRO_DRIVE_NAME
+#define INTERNAL_STORAGE_PATH GOPRO_INTERNAL_STORAGE_PATH
+#define INTERNAL_STORAGE_DESC GOPRO_DRIVE_NAME
+//#define DEVICE_FRIENDLY_NAME  GOPRO_DEVICE_NAME
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+char *mDeviceFriendlyName;
 
 static void* inotifyWatchEntry(void *obj);
 
@@ -254,10 +257,21 @@ uint32_t MyMtpDatabase::getCompressedFileSize(const MtpString& path)
         return attr.st_size;
 }
 
+static char* objExtension_str_to_lower(char *str)
+{
+  int i = 0;
+  int len = strlen(str);
+  for (i=0; i<len; i++)
+    str[i] = tolower(str[i]);
+  return str;
+}
+
 void MyMtpDatabase::addObjectInfo(const MtpString& path, MtpObjectHandle parent, MtpStorageID storage)
 {
     ObjectInfo objInfo;
     MtpObjectHandle handle = mHandleId++;
+    char * objExtension;
+    MtpObjectFormat objFormat;
 
     if (isDirectory(path)) {
         objInfo.mStorageId = storage;
@@ -279,18 +293,23 @@ void MyMtpDatabase::addObjectInfo(const MtpString& path, MtpObjectHandle parent,
 
         enumDirectory(path, handle, storage);
     } else {
-        objInfo.mStorageId = storage;
-        objInfo.mParent = parent;
-        objInfo.mName = ::strdup(path.getPathLeaf());
-        objInfo.mPath = ::strdup(path);
-        objInfo.mFormat = getObjectFormatByExtension(path.getPathExtension());
-        objInfo.mCompressedSize = getCompressedFileSize(path);
-        objInfo.mDateModified = getModifiedTime(path);
-        mObjectDb.insert( std::pair<MtpObjectHandle, ObjectInfo>(handle, objInfo) );
-        ALOGD("%s: add file %s\n", __func__, path.string());
+        objExtension = ::strdup(path.getPathExtension());
+        objFormat = getObjectFormatByExtension(static_cast <MtpString > (objExtension_str_to_lower(objExtension)));
+        if (objFormat != MTP_FORMAT_UNDEFINED)
+        {
+            objInfo.mStorageId = storage;
+            objInfo.mParent = parent;
+            objInfo.mName = ::strdup(path.getPathLeaf());
+            objInfo.mPath = ::strdup(path);
+            objInfo.mFormat = objFormat;
+            objInfo.mCompressedSize = getCompressedFileSize(path);
+            objInfo.mDateModified = getModifiedTime(path);
+            mObjectDb.insert( std::pair<MtpObjectHandle, ObjectInfo>(handle, objInfo) );
+            ALOGD("%s: add file %s\n", __func__, path.string());
 
-        if (mServer)
-            mServer->sendObjectAdded(handle);
+            if (mServer)
+                mServer->sendObjectAdded(handle);
+        }
     }
 }
 
@@ -378,7 +397,7 @@ MtpObjectHandle MyMtpDatabase::beginSendObject(const char* path,
     MtpObjectHandle handle = mHandleId;
     MtpString pathString(path);
 
-    if (pathString.find(INTERNAL_STORAGE_PATH) == -1 && pathString.find(EXTERNAL_STORAGE_PATH) == -1)
+    if (pathString.find(INTERNAL_STORAGE_PATH) == -1 ) /*Not checking external drive*/ //&& pathString.find(EXTERNAL_STORAGE_PATH) == -1)
         return kInvalidObjectHandle;
     if (::access(path, F_OK) == 0) {
         ALOGD("%s:path %s exists, return\n", __func__, path);
@@ -486,28 +505,15 @@ int MyMtpDatabase::getNumObjects(MtpStorageID storageID,
 
 MtpObjectFormatList* MyMtpDatabase::getSupportedPlaybackFormats()
 {
+    /* Supported object formats*/
     static const uint16_t playbackFormatList[] = {
         MTP_FORMAT_UNDEFINED,
         MTP_FORMAT_ASSOCIATION,
         MTP_FORMAT_TEXT,
-        MTP_FORMAT_HTML,
-        MTP_FORMAT_WAV,
-        MTP_FORMAT_MP3,
-        MTP_FORMAT_MPEG,
-        MTP_FORMAT_EXIF_JPEG,
-        MTP_FORMAT_TIFF_EP,
-        MTP_FORMAT_BMP,
-        MTP_FORMAT_GIF,
-        MTP_FORMAT_JFIF,
-        MTP_FORMAT_PNG,
-        MTP_FORMAT_TIFF,
-        MTP_FORMAT_WMA,
-        MTP_FORMAT_OGG,
-        MTP_FORMAT_AAC,
+        MTP_FORMAT_HTML,        
+        MTP_FORMAT_EXIF_JPEG,       
         MTP_FORMAT_MP4_CONTAINER,
-        MTP_FORMAT_3GP_CONTAINER,
-        MTP_FORMAT_ABSTRACT_AV_PLAYLIST,
-        MTP_FORMAT_FLAC
+	MTP_FORMAT_WAV
     };
 
     MtpObjectFormatList* list = new MtpObjectFormatList();
@@ -685,7 +691,7 @@ MtpResponseCode MyMtpDatabase::getDevicePropertyValue(MtpDeviceProperty property
     {
         case MTP_DEVICE_PROPERTY_SYNCHRONIZATION_PARTNER:
         case MTP_DEVICE_PROPERTY_DEVICE_FRIENDLY_NAME:
-            packet.putString(DEVICE_FRIENDLY_NAME); //FIXME: more suitable name?
+            packet.putString(mDeviceFriendlyName); //FIXME: more suitable name?
             break;
         default:
             return MTP_RESPONSE_OPERATION_NOT_SUPPORTED;
@@ -972,7 +978,7 @@ MtpProperty* MyMtpDatabase::getDevicePropertyDesc(MtpDeviceProperty property)
     ALOGD("%s: %s\n", __func__, MtpDebug::getDevicePropCodeName(property));
 
     MtpProperty* result = NULL;
-    String16 str(DEVICE_FRIENDLY_NAME); //Same with getDevicePropertyValue.
+    String16 str(mDeviceFriendlyName); //Same with getDevicePropertyValue.
     switch(property)
     {
         case MTP_DEVICE_PROPERTY_SYNCHRONIZATION_PARTNER:
@@ -1178,7 +1184,13 @@ static void inotifyAddWatch() {
 static void addExternalStorage()
 {
     ALOGD("%s\n", __func__);
-    mExternalStorage = new MtpStorage(MTP_STORAGE_REMOVABLE_RAM, EXTERNAL_STORAGE_PATH, EXTERNAL_STORAGE_DESC, 0, true, 0);
+
+    if(access(EXTERNAL_STORAGE_PATH, F_OK) < 0) {
+        ALOGD("%s: path %s not exist\n", __func__, INTERNAL_STORAGE_PATH);
+        return;
+    }
+
+    mExternalStorage = new MtpStorage(MTP_STORAGE_REMOVABLE_RAM, EXTERNAL_STORAGE_PATH, EXTERNAL_STORAGE_DESC, 0, true, 0, mDeviceFriendlyName);
     myDatabase->addStorage(MtpString(EXTERNAL_STORAGE_PATH), MtpString(EXTERNAL_STORAGE_DESC), mExternalStorage->getStorageID());
 
     mServer->addStorage(mExternalStorage);
@@ -1194,7 +1206,7 @@ static void checkAndAddInternalStorage() {
     }
 
     mInternalStorage = new MtpStorage(MTP_STORAGE_FIXED_RAM, INTERNAL_STORAGE_PATH,
-            INTERNAL_STORAGE_DESC, 0, false, 0);
+            INTERNAL_STORAGE_DESC, 0, false, 0, mDeviceFriendlyName);
     myDatabase->addStorage(MtpString(INTERNAL_STORAGE_PATH),
             MtpString(INTERNAL_STORAGE_DESC), mInternalStorage->getStorageID());
 
@@ -1326,7 +1338,10 @@ int main(int argc, char** argv)
 {
     int ret;
     pthread_t inotifyWatchMediaThread;
-
+    int fd_tas, fd_bb;
+    bool tas_supported =  false;
+    bool boomer_supported = false;
+    bool badger_supported = false;
 
     //Initialize
     myDatabase = new MyMtpDatabase();
@@ -1349,8 +1364,42 @@ int main(int argc, char** argv)
         goto fail;
     }
     inotifyAddWatch();
-    checkExternalStorage();
-    checkAndAddInternalStorage();
+    //checkExternalStorage(); /*Not Adding External Storage to MTP as SD card won't be present in Camera*/
+
+    /* FIXME: Since product id is not available here, using a file presence to verify the product type*/
+    fd_tas = open("/tmp/support_tasmania.txt", O_RDONLY); //fd is closed in MtpServer::run.
+    if (fd_tas >= 0) {
+        mDeviceFriendlyName = ::strdup(BOOMER_DEVICE_NAME);
+        tas_supported = true;
+        close(fd_tas);
+    }
+
+    fd_bb = open("/tmp/boomer.txt", O_RDONLY);
+    if (fd_bb >= 0)
+    {
+        mDeviceFriendlyName = ::strdup(BOOMER_DEVICE_NAME);
+        boomer_supported = true;
+        close(fd_bb);
+    }
+
+    fd_bb = open("/tmp/badger.txt", O_RDONLY);
+    if (fd_bb >= 0)
+    {
+        mDeviceFriendlyName = ::strdup(BADGER_DEVICE_NAME);
+        badger_supported = true;
+        close(fd_bb);
+    }
+
+    /* For older tasmania cameras, only internal storage will be shown as MTP drive.*/
+    if (tas_supported)
+    {
+        checkAndAddInternalStorage();
+    }
+    /* For Boomer and badger MTP drive will be shown on SD card*/
+    else if (badger_supported || boomer_supported)
+    {
+        addExternalStorage();
+    }
 
     installSignalHandler();
 

@@ -34,16 +34,17 @@ namespace android {
 
 MtpStorage::MtpStorage(MtpStorageID id, const char* filePath,
         const char* description, uint64_t reserveSpace,
-        bool removable, uint64_t maxFileSize)
+        bool removable, uint64_t maxFileSize, const char* device_name)
     :   mStorageID(id),
         mFilePath(filePath),
         mDescription(description),
         mMaxCapacity(0),
         mMaxFileSize(maxFileSize),
         mReserveSpace(reserveSpace),
-        mRemovable(removable)
+        mRemovable(removable),
+        mDeviceName(device_name)
 {
-    ALOGV("MtpStorage id: %d path: %s\n", id, filePath);
+    ALOGV("MtpStorage id: %d path: %s \n", id, filePath);
 }
 
 MtpStorage::~MtpStorage() {
@@ -81,6 +82,10 @@ uint64_t MtpStorage::getFreeSpace() {
 
 const char* MtpStorage::getDescription() const {
     return (const char *)mDescription;
+}
+
+const char* MtpStorage::getDeviceName() const {
+    return (const char *)mDeviceName;
 }
 
 }  // namespace android

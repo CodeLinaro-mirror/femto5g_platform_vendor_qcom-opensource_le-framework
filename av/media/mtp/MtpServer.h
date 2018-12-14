@@ -100,6 +100,7 @@ public:
     bool                hasStorage(MtpStorageID id);
     void                addStorage(MtpStorage* storage);
     void                removeStorage(MtpStorage* storage);
+    const char*         getDeviceName();
 
     void                run();
 

@@ -35,11 +35,12 @@ private:
     // amount of free space to leave unallocated
     uint64_t                mReserveSpace;
     bool                    mRemovable;
+    MtpString               mDeviceName;
 
 public:
                             MtpStorage(MtpStorageID id, const char* filePath,
                                     const char* description, uint64_t reserveSpace,
-                                    bool removable, uint64_t maxFileSize);
+                                    bool removable, uint64_t maxFileSize, const char* device_name);
     virtual                 ~MtpStorage();
 
     inline MtpStorageID     getStorageID() const { return mStorageID; }
@@ -49,6 +50,7 @@ public:
     uint64_t                getMaxCapacity();
     uint64_t                getFreeSpace();
     const char*             getDescription() const;
+    const char*             getDeviceName() const;
     inline const char*      getPath() const { return (const char *)mFilePath; }
     inline bool             isRemovable() const { return mRemovable; }
     inline uint64_t         getMaxFileSize() const { return mMaxFileSize; }
