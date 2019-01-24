@@ -341,6 +341,7 @@ typedef enum {
     AUDIO_FORMAT_APTX                = 0x20000000UL,
     AUDIO_FORMAT_APTX_HD             = 0x21000000UL,
     AUDIO_FORMAT_APTX_ADAPTIVE       = 0x25000000UL,
+    AUDIO_FORMAT_MAT                 = 0x30000000UL,
     AUDIO_FORMAT_AAC_LATM            = 0x80000000UL,
 
     AUDIO_FORMAT_MAIN_MASK           = 0xFF000000UL,
@@ -501,6 +502,10 @@ enum {
                                   AUDIO_CHANNEL_OUT_BACK_RIGHT |
                                   AUDIO_CHANNEL_OUT_SIDE_LEFT |
                                   AUDIO_CHANNEL_OUT_SIDE_RIGHT),
+    // matches the correct AudioFormat.CHANNEL_OUT_7POINT1POINT2 definition for 7.1.2
+    AUDIO_CHANNEL_OUT_7POINT1POINT2  = (AUDIO_CHANNEL_OUT_7POINT1 |
+                                  AUDIO_CHANNEL_OUT_FRONT_LEFT_OF_CENTER |
+                                  AUDIO_CHANNEL_OUT_FRONT_RIGHT_OF_CENTER),
     // matches the correct AudioFormat.CHANNEL_OUT_7POINT1_SURROUND definition for 7.1.4
     AUDIO_CHANNEL_OUT_7POINT1POINT4  = (AUDIO_CHANNEL_OUT_7POINT1 |
                                   AUDIO_CHANNEL_OUT_TOP_FRONT_LEFT |
@@ -1610,6 +1615,9 @@ static inline audio_channel_mask_t audio_channel_out_mask_from_count(uint32_t ch
         break;
     case 8: // 7.1
         bits = AUDIO_CHANNEL_OUT_7POINT1;
+        break;
+    case 10: // 7.1.2
+        bits = AUDIO_CHANNEL_OUT_7POINT1POINT2;
         break;
     case 12: // 7.1.4
         bits = AUDIO_CHANNEL_OUT_7POINT1POINT4;
