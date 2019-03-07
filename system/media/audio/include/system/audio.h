@@ -316,28 +316,28 @@ typedef enum {
     AUDIO_FORMAT_DTS_HD              = 0x0C000000UL,
     // IEC61937 is encoded audio wrapped in 16-bit PCM.
     AUDIO_FORMAT_IEC61937            = 0x0D000000UL,
+    AUDIO_FORMAT_DOLBY_TRUEHD        = 0x0E000000UL,
     AUDIO_FORMAT_EVRC                = 0x10000000UL,
-    AUDIO_FORMAT_QCELP               = 0x11000000UL,
-    AUDIO_FORMAT_WMA                 = 0x12000000UL,
-    AUDIO_FORMAT_WMA_PRO             = 0x13000000UL,
+    AUDIO_FORMAT_EVRCB               = 0x11000000UL,
+    AUDIO_FORMAT_EVRCWB              = 0x12000000UL,
+    AUDIO_FORMAT_EVRCNW              = 0x13000000UL,
     AUDIO_FORMAT_AAC_ADIF            = 0x14000000UL,
-    AUDIO_FORMAT_EVRCB               = 0x15000000UL,
-    AUDIO_FORMAT_EVRCWB              = 0x16000000UL,
+    AUDIO_FORMAT_WMA                 = 0x15000000UL,
+    AUDIO_FORMAT_WMA_PRO             = 0x16000000UL,
     AUDIO_FORMAT_AMR_WB_PLUS         = 0x17000000UL,
     AUDIO_FORMAT_MP2                 = 0x18000000UL,
-    AUDIO_FORMAT_EVRCNW              = 0x19000000UL,
-    AUDIO_FORMAT_PCM_OFFLOAD         = 0x1A000000UL,
+    AUDIO_FORMAT_QCELP               = 0x19000000UL,
+    AUDIO_FORMAT_DSD                 = 0x1A000000UL,
     AUDIO_FORMAT_FLAC                = 0x1B000000UL,
     AUDIO_FORMAT_ALAC                = 0x1C000000UL,
     AUDIO_FORMAT_APE                 = 0x1D000000UL,
     AUDIO_FORMAT_AAC_ADTS            = 0x1E000000UL,
-    AUDIO_FORMAT_DSD                 = 0x1F000000UL,
-    AUDIO_FORMAT_SBC                 = 0x20000000UL,
-    AUDIO_FORMAT_APTX                = 0x21000000UL,
-    AUDIO_FORMAT_APTX_HD             = 0x22000000UL,
+    AUDIO_FORMAT_SBC                 = 0x1F000000UL,
+    AUDIO_FORMAT_APTX                = 0x20000000UL,
+    AUDIO_FORMAT_APTX_HD             = 0x21000000UL,
+    AUDIO_FORMAT_APTX_ADAPTIVE       = 0x25000000UL,
     AUDIO_FORMAT_AAC_LATM            = 0x80000000UL,
 
-    AUDIO_FORMAT_DOLBY_TRUEHD        = 0x0E000000UL,
     AUDIO_FORMAT_MAIN_MASK           = 0xFF000000UL,
     AUDIO_FORMAT_SUB_MASK            = 0x00FFFFFFUL,
 
@@ -402,11 +402,6 @@ typedef enum {
                                         AUDIO_FORMAT_AAC_SUB_HE_V1),
     AUDIO_FORMAT_AAC_LATM_HE_V2      = (AUDIO_FORMAT_AAC_LATM |\
                                         AUDIO_FORMAT_AAC_SUB_HE_V2),
-    /*Offload PCM formats*/
-    AUDIO_FORMAT_PCM_16_BIT_OFFLOAD  = (AUDIO_FORMAT_PCM_OFFLOAD |
-                                        AUDIO_FORMAT_PCM_SUB_16_BIT),
-    AUDIO_FORMAT_PCM_24_BIT_OFFLOAD  = (AUDIO_FORMAT_PCM_OFFLOAD |
-                                        AUDIO_FORMAT_PCM_SUB_8_24_BIT),
 } audio_format_t;
 
 /* For the channel mask for position assignment representation */
@@ -985,13 +980,57 @@ typedef struct {
 /* Information about BT APTX encoder configuration
  * This data is used between audio HAL module and
  * BT IPC library to configure DSP encoder
+ * for Classic and HD aptx mode
  */
 typedef struct {
     uint16_t sampling_rate;
     uint8_t  channels;
     uint32_t bitrate;
     uint32_t bits_per_sample;
-} audio_aptx_encoder_config;
+} audio_aptx_default_config;
+
+/* Define audio_aptx_encoder_config
+ * to maintain backward compatibility on bthost side
+ */
+typedef audio_aptx_default_config audio_aptx_encoder_config;
+
+/* Information about BT APTX ADAPTIVE encoder configuration
+ * This data is used between audio HAL module and
+ * BT IPC library to configure DSP encoder
+ * for HQ and LL mode
+ */
+typedef struct {
+    uint8_t sampling_rate;
+    uint8_t  channel_mode;
+    uint16_t mtu;
+    uint8_t min_sink_buffering_LL;
+    uint8_t max_sink_buffering_LL;
+    uint8_t min_sink_buffering_HQ;
+    uint8_t max_sink_buffering_HQ;
+    uint8_t min_sink_buffering_TWS;
+    uint8_t max_sink_buffering_TWS;
+    uint8_t TTP_LL_low;
+    uint8_t TTP_LL_high;
+    uint8_t TTP_HQ_low;
+    uint8_t TTP_HQ_high;
+    uint8_t TTP_TWS_low;
+    uint8_t TTP_TWS_high;
+    uint32_t bits_per_sample;
+    uint16_t aptx_mode;
+} audio_aptx_ad_config;
+
+/* Information about BT APTX encoder configuration
+ * This data is used between audio HAL module and
+ * BT IPC library to configure DSP encoder
+ * for TWS in dual mono scenario
+ */
+typedef struct {
+    uint16_t sampling_rate;
+    uint8_t  channels;
+    uint32_t bitrate;
+    uint8_t sync_mode;
+    uint32_t bits_per_sample;
+} audio_aptx_dual_mono_config;
 
 /* Information about BT AAC encoder configuration
  * This data is used between audio HAL module and
@@ -1662,11 +1701,6 @@ static inline bool audio_is_valid_format(audio_format_t format)
     case AUDIO_FORMAT_APTX:
     case AUDIO_FORMAT_DSD:
         return true;
-    case AUDIO_FORMAT_PCM_OFFLOAD:
-        if (format != AUDIO_FORMAT_PCM_16_BIT_OFFLOAD &&
-                format != AUDIO_FORMAT_PCM_24_BIT_OFFLOAD) {
-            return false;
-        }
     case AUDIO_FORMAT_DOLBY_TRUEHD:
         return true;
     default:
@@ -1714,7 +1748,6 @@ static inline size_t audio_bytes_per_sample(audio_format_t format)
     switch (format) {
     case AUDIO_FORMAT_PCM_32_BIT:
     case AUDIO_FORMAT_PCM_8_24_BIT:
-    case AUDIO_FORMAT_PCM_24_BIT_OFFLOAD:
         size = sizeof(int32_t);
         break;
     case AUDIO_FORMAT_PCM_24_BIT_PACKED:
@@ -1722,7 +1755,6 @@ static inline size_t audio_bytes_per_sample(audio_format_t format)
         break;
     case AUDIO_FORMAT_PCM_16_BIT:
     case AUDIO_FORMAT_IEC61937:
-    case AUDIO_FORMAT_PCM_16_BIT_OFFLOAD:
         size = sizeof(int16_t);
         break;
     case AUDIO_FORMAT_PCM_8_BIT:
