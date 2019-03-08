@@ -56,6 +56,11 @@ __BEGIN_DECLS
 typedef int audio_io_handle_t;
 #define AUDIO_IO_HANDLE_NONE    0
 
+/* Reconfigure offloaded A2DP codec */
+#define AUDIO_PARAMETER_RECONFIG_A2DP "reconfigA2dp"
+/* Query if HwModule supports reconfiguration of offloaded A2DP codec */
+#define AUDIO_PARAMETER_A2DP_RECONFIG_SUPPORTED "isReconfigA2dpSupported"
+
 /* Audio stream types */
 typedef enum {
     /* These values must kept in sync with
