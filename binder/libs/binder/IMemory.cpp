@@ -31,7 +31,9 @@
 #include <utils/threads.h>
 #include <utils/Atomic.h>
 #include <binder/Parcel.h>
+#if DEBUG_REFS_CALLSTACK_ENABLED
 #include <utils/CallStack.h>
+#endif
 
 #define VERBOSE   0
 
