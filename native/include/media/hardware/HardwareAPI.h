@@ -20,7 +20,9 @@
 
 #include <media/hardware/OMXPluginBase.h>
 #include <media/hardware/MetadataBufferType.h>
+#ifndef __USE_GBM__
 #include <system/window.h>
+#endif
 #include <utils/RefBase.h>
 
 #include "VideoAPI.h"
@@ -124,12 +126,17 @@ struct StoreMetaDataInBuffersParams {
     OMX_BOOL bStoreMetaData;
 };
 
+#ifdef __USE_GBM__
+typedef struct gbm_bo* buffer_handle_t;
+#endif
 // Meta data buffer layout used to transport output frames to the decoder for
 // dynamic buffer handling.
 struct VideoGrallocMetadata {
     MetadataBufferType eType;               // must be kMetadataBufferTypeGrallocSource
 #ifdef OMX_ANDROID_COMPILE_AS_32BIT_ON_64BIT_PLATFORMS
     OMX_PTR pHandle;
+#elif __USE_GBM__
+    struct gbm_bo* pHandle;
 #else
     buffer_handle_t pHandle;
 #endif
@@ -154,6 +161,8 @@ struct VideoNativeHandleMetadata {
 
 #ifdef OMX_ANDROID_COMPILE_AS_32BIT_ON_64BIT_PLATFORMS
     OMX_PTR pHandle;
+#elif __USE_GBM__
+    struct gbm_bo* pHandle;
 #else
     native_handle_t *pHandle;
 #endif
