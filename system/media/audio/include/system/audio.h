@@ -516,6 +516,10 @@ enum {
                                   AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT |
                                   AUDIO_CHANNEL_OUT_TOP_BACK_LEFT |
                                   AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT),
+    // matches the correct AudioFormat.CHANNEL_OUT_9POINT1_SURROUND definition for 9.1.4
+    AUDIO_CHANNEL_OUT_9POINT1POINT4  = (AUDIO_CHANNEL_OUT_7POINT1POINT4 |
+                                  AUDIO_CHANNEL_OUT_WIDE_LEFT |
+                                  AUDIO_CHANNEL_OUT_WIDE_RIGHT),
     // matches the correct AudioFormat.CHANNEL_OUT_9POINT1_SURROUND definition for 9.1.6
     AUDIO_CHANNEL_OUT_9POINT1POINT6  = (AUDIO_CHANNEL_OUT_7POINT1POINT4 |
                                   AUDIO_CHANNEL_OUT_WIDE_LEFT |
@@ -1641,6 +1645,9 @@ static inline audio_channel_mask_t audio_channel_out_mask_from_count(uint32_t ch
         break;
     case 12: // 7.1.4
         bits = AUDIO_CHANNEL_OUT_7POINT1POINT4;
+        break;
+    case 14: // 9.1.4
+        bits = AUDIO_CHANNEL_OUT_9POINT1POINT4;
         break;
     case 16: // 9.1.6
         bits = AUDIO_CHANNEL_OUT_9POINT1POINT6;
