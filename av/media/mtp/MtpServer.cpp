@@ -1063,7 +1063,7 @@ static void deleteRecursive(const char* path) {
     if (pathLength >= sizeof(pathbuf) - 1) {
         ALOGE("path too long: %s\n", path);
     }
-    strcpy(pathbuf, path);
+    strlcpy(pathbuf, path, sizeof(pathbuf));
     if (pathbuf[pathLength - 1] != '/') {
         pathbuf[pathLength++] = '/';
     }
@@ -1090,7 +1090,7 @@ static void deleteRecursive(const char* path) {
             ALOGE("path %s/%s too long\n", path, name);
             continue;
         }
-        strcpy(fileSpot, name);
+        strlcpy(fileSpot, name, sizeof(filespot));
 
         int type = entry->d_type;
         if (entry->d_type == DT_DIR) {
