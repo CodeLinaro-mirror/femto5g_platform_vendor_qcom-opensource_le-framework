@@ -29,17 +29,6 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 PKG_PROG_PKG_CONFIG
 
-AC_ARG_WITH([core_includes],
-      AC_HELP_STRING([--with-core-includes=@<:@dir@:>@],
-         [Specify the location of the core headers]),
-      [core_incdir=$withval],
-      with_core_includes=no)
-
-if test "x$with_core_includes" != "xno"; then
-     CPPFLAGS="${CPPFLAGS} -I${core_incdir}"
-     AC_SUBST(core_incdir,${core_incdir})
-fi
-
 AC_ARG_WITH([glib],
       AC_HELP_STRING([--with-glib],
          [enable glib, building HLOS systems which use glib]))
@@ -65,14 +54,6 @@ AC_SUBST([LIBS])
 
 AC_CONFIG_FILES([ \
         Makefile \
-        audio_route/Makefile \
-        audio_route/audio_route.pc \
-        audio_utils/Makefile \
-        audio_utils/audio_utils.pc \
-        audio_utils/tinysndfile.pc \
-        audio/include/Makefile \
-        audio_effects/include/Makefile
-        alsa_utils/Makefile \
-        alsa_utils/alsa_utils.pc
+        alsa_utils.pc \
         ])
 AC_OUTPUT

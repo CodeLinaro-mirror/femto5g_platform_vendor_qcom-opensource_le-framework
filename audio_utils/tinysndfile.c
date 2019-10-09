@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include <audio_utils/sndfile.h>
-#include <audio_utils/primitives.h>
+#include <sndfile.h>
+#include <primitives.h>
 #ifdef HAVE_STDERR
 #include <stdio.h>
 #endif

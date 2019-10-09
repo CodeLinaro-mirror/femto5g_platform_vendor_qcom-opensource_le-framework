@@ -1,11 +1,22 @@
+#                                               -*- Autoconf -*-
+# configure.ac -- Autoconf script
+#
+
+# Process this file with autoconf to produce a configure script
+
+# Requires autoconf tool later than 2.61
 AC_PREREQ(2.61)
-AC_INIT([av-frameworks], 1.0.0)
-AM_INIT_AUTOMAKE([-Wall gnu foreign])
+# Initialize the system-media package version 1.0.0
+AC_INIT([system-media], 1.0.0)
+# Does not strictly follow GNU Coding standards
+AM_INIT_AUTOMAKE([foreign])
+# Verifies the --srcdir is correct by checking for the path
 AC_CONFIG_SRCDIR([Makefile.am])
+# defines some macros variable to be included by source
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
-# Check for programs
+# Checks for programs.
 LT_INIT
 AC_PROG_LIBTOOL
 AC_PROG_CXX
@@ -18,28 +29,13 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 PKG_PROG_PKG_CONFIG
 
-AC_ARG_WITH([core_includes],
-      AC_HELP_STRING([--with-core-includes=@<:@dir@:>@],
-         [Specify the location of the core headers]),
-      [core_incdir=$withval],
-      with_core_includes=no)
-
-if test "x$with_core_includes" != "xno"; then
-     CPPFLAGS="${CPPFLAGS} -I${core_incdir}"
-     AC_SUBST(core_incdir,${core_incdir})
-fi
-
-AC_ARG_WITH(kernel-headers,
-   AS_HELP_STRING([--with-kernel-headers=DIR],
-       [Specify the location of the Linux headers]),
-   [CPPFLAGS="$CPPFLAGS -idirafter $withval"])
-
 AC_ARG_WITH([glib],
       AC_HELP_STRING([--with-glib],
          [enable glib, building HLOS systems which use glib]))
 
 if (test "x${with_glib}" = "xyes"); then
         AC_DEFINE(ENABLE_USEGLIB, 1, [Define if HLOS systems uses glib])
+
         PKG_CHECK_MODULES(GTHREAD, gthread-2.0 >= 2.16, dummy=yes,
                                 AC_MSG_ERROR(GThread >= 2.16 is required))
         PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.16, dummy=yes,
@@ -57,9 +53,7 @@ AC_SUBST([CPPFLAGS])
 AC_SUBST([LIBS])
 
 AC_CONFIG_FILES([ \
-        Makefile  \
-        camera/Makefile \
-        camera/libcamera_client.pc \
-        media/mtp/Makefile
+        Makefile \
+        alsa_utils.pc \
         ])
 AC_OUTPUT

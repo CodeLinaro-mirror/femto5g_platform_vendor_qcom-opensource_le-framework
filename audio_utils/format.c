@@ -18,8 +18,8 @@
 #define LOG_TAG "audio_utils_format"
 
 #include <cutils/log.h>
-#include <audio_utils/primitives.h>
-#include <audio_utils/format.h>
+#include <primitives.h>
+#include <format.h>
 
 void memcpy_by_audio_format(void *dst, audio_format_t dst_format,
         const void *src, audio_format_t src_format, size_t count)

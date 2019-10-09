@@ -15,7 +15,7 @@
  */
 
 #include <string.h>
-#include <audio_utils/channels.h>
+#include <channels.h>
 #include "private/private.h"
 
 /*

@@ -4,7 +4,7 @@ pkgconfig_DATA = audio_route.pc
 AM_CFLAGS = -Werror -Wall
 
 library_includedir = $(includedir)/audio_route
-library_include_HEADERS = include/audio_route/audio_route.h
+library_include_HEADERS = include/audio_route.h
 
 c_sources = audio_route.c
 

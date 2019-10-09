@@ -1,4 +1,9 @@
-h_sources = audio_effects/audio_effects_conf.h \
+sys_includedir = $(includedir)/system/
+sys_include_HEADERS = system/sound_trigger.h \
+            system/audio.h \
+            system/audio_policy.h
+
+audeffect_include_HEADERS = audio_effects/audio_effects_conf.h \
             audio_effects/effect_aec.h \
             audio_effects/effect_agc.h \
             audio_effects/effect_bassboost.h \
@@ -11,5 +16,4 @@ h_sources = audio_effects/audio_effects_conf.h \
             audio_effects/effect_virtualizer.h \
             audio_effects/effect_visualizer.h
 
-lib_includedir = $(includedir)/audio_effects/
-lib_include_HEADERS = $(h_sources)
+audeffect_includedir = $(includedir)/audio_effects/

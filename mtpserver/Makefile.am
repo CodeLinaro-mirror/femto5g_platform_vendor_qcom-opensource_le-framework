@@ -9,8 +9,9 @@ mtpserver_CPPFLAGS += -DLINUX_ENABLED
 mtpserver_CPPFLAGS += -DHAVE_PTHREADS
 mtpserver_CPPFLAGS += -DANDROID_SMP=0
 mtpserver_CPPFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE=1 -D_LARGEFILE_SOURCE=1
+mtpserver_CPPFLAGS += @GLIB_CFLAGS@ -include glib.h -Dstrlcpy=g_strlcpy
 
-mtpserver_LDADD = -lpthread -lutils -lcutils
+mtpserver_LDADD     = -lpthread -lutils -lcutils -llog @GLIB_LIBS@
 
 # source to compile
 mtpserver_SOURCES = MtpDebug.cpp \
