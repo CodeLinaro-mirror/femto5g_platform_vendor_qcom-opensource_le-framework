@@ -444,6 +444,10 @@ enum {
     AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT        = 0x20000,
     AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT         = 0x40000u,
     AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT        = 0x80000u,
+    AUDIO_CHANNEL_OUT_WIDE_LEFT             = 0x100000u,
+    AUDIO_CHANNEL_OUT_WIDE_RIGHT            = 0x200000u,
+    AUDIO_CHANNEL_OUT_BACK_LEFT_OF_CENTER   = 0x400000u,
+    AUDIO_CHANNEL_OUT_BACK_RIGHT_OF_CENTER  = 0x800000u,
 
 /* TODO: should these be considered complete channel masks, or only bits? */
 
@@ -504,20 +508,34 @@ enum {
                                   AUDIO_CHANNEL_OUT_SIDE_RIGHT),
     // matches the correct AudioFormat.CHANNEL_OUT_7POINT1POINT2 definition for 7.1.2
     AUDIO_CHANNEL_OUT_7POINT1POINT2  = (AUDIO_CHANNEL_OUT_7POINT1 |
-                                  AUDIO_CHANNEL_OUT_FRONT_LEFT_OF_CENTER |
-                                  AUDIO_CHANNEL_OUT_FRONT_RIGHT_OF_CENTER),
+                                  AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT |
+                                  AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT),
     // matches the correct AudioFormat.CHANNEL_OUT_7POINT1_SURROUND definition for 7.1.4
     AUDIO_CHANNEL_OUT_7POINT1POINT4  = (AUDIO_CHANNEL_OUT_7POINT1 |
                                   AUDIO_CHANNEL_OUT_TOP_FRONT_LEFT |
                                   AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT |
                                   AUDIO_CHANNEL_OUT_TOP_BACK_LEFT |
                                   AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT),
+    // matches the correct AudioFormat.CHANNEL_OUT_9POINT1_SURROUND definition for 9.1.4
+    AUDIO_CHANNEL_OUT_9POINT1POINT4  = (AUDIO_CHANNEL_OUT_7POINT1POINT4 |
+                                  AUDIO_CHANNEL_OUT_WIDE_LEFT |
+                                  AUDIO_CHANNEL_OUT_WIDE_RIGHT),
     // matches the correct AudioFormat.CHANNEL_OUT_9POINT1_SURROUND definition for 9.1.6
     AUDIO_CHANNEL_OUT_9POINT1POINT6  = (AUDIO_CHANNEL_OUT_7POINT1POINT4 |
+                                  AUDIO_CHANNEL_OUT_WIDE_LEFT |
+                                  AUDIO_CHANNEL_OUT_WIDE_RIGHT |
+                                  AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT |
+                                  AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT),
+    // combined 9.1.6 plus 2 extra channels
+    AUDIO_CHANNEL_OUT_9POINT1POINT6PLUS2  = (AUDIO_CHANNEL_OUT_9POINT1POINT6 |
+                                  AUDIO_CHANNEL_OUT_FRONT_LEFT_OF_CENTER |
+                                  AUDIO_CHANNEL_OUT_FRONT_RIGHT_OF_CENTER),
+    // combined 9.1.6 plus 4 extra channels
+    AUDIO_CHANNEL_OUT_9POINT1POINT6PLUS4  = (AUDIO_CHANNEL_OUT_9POINT1POINT6 |
                                   AUDIO_CHANNEL_OUT_FRONT_LEFT_OF_CENTER |
                                   AUDIO_CHANNEL_OUT_FRONT_RIGHT_OF_CENTER |
-                                  AUDIO_CHANNEL_OUT_TOP_FRONT_CENTER |
-                                  AUDIO_CHANNEL_OUT_TOP_BACK_CENTER),
+                                  AUDIO_CHANNEL_OUT_BACK_LEFT_OF_CENTER |
+                                  AUDIO_CHANNEL_OUT_BACK_RIGHT_OF_CENTER),
     AUDIO_CHANNEL_OUT_ALL      = (AUDIO_CHANNEL_OUT_FRONT_LEFT |
                                   AUDIO_CHANNEL_OUT_FRONT_RIGHT |
                                   AUDIO_CHANNEL_OUT_FRONT_CENTER |
@@ -535,7 +553,13 @@ enum {
                                   AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT|
                                   AUDIO_CHANNEL_OUT_TOP_BACK_LEFT|
                                   AUDIO_CHANNEL_OUT_TOP_BACK_CENTER|
-                                  AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT),
+                                  AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT|
+                                  AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT|
+                                  AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT|
+                                  AUDIO_CHANNEL_OUT_WIDE_LEFT|
+                                  AUDIO_CHANNEL_OUT_WIDE_RIGHT|
+                                  AUDIO_CHANNEL_OUT_BACK_LEFT_OF_CENTER|
+                                  AUDIO_CHANNEL_OUT_BACK_RIGHT_OF_CENTER),
 
 /* These are bits only, not complete values */
 
@@ -1622,10 +1646,18 @@ static inline audio_channel_mask_t audio_channel_out_mask_from_count(uint32_t ch
     case 12: // 7.1.4
         bits = AUDIO_CHANNEL_OUT_7POINT1POINT4;
         break;
+    case 14: // 9.1.4
+        bits = AUDIO_CHANNEL_OUT_9POINT1POINT4;
+        break;
     case 16: // 9.1.6
         bits = AUDIO_CHANNEL_OUT_9POINT1POINT6;
         break;
-    // FIXME FCC_8
+    case 18: // 9.1.6 plus 2
+        bits = AUDIO_CHANNEL_OUT_9POINT1POINT6PLUS2;
+        break;
+    case 20: // 9.1.6 plus 4
+        bits = AUDIO_CHANNEL_OUT_9POINT1POINT6PLUS4;
+        break;
     default:
         return AUDIO_CHANNEL_INVALID;
     }
