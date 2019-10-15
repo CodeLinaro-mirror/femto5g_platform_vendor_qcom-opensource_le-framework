@@ -17,7 +17,7 @@ c_sources = alsa_device_profile.c \
 
 lib_LTLIBRARIES = libalsautils.la
 libalsautils_la_SOURCES = $(c_sources)
-libalsautils_la_LIBADD = -ltinyalsa -llog -lcutils ../audio_utils/libaudioutils.la
+libalsautils_la_LIBADD = -ltinyalsa -llog -lcutils -laudioutils
 libalsautils_la_CFLAGS = $(AM_CFLAGS)
 libalsautils_la_CFLAGS += -Dstrlcat=g_strlcat -include glib.h -DUSE_GLIB $(GLIB_CFLAGS)
 libalsautils_la_LDFLAGS = -shared -avoid-version $(GLIB_LIBS)
