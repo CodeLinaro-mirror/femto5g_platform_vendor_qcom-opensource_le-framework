@@ -17,3 +17,12 @@ audeffect_include_HEADERS = audio_effects/audio_effects_conf.h \
             audio_effects/effect_visualizer.h
 
 audeffect_includedir = $(includedir)/audio_effects/
+
+hardware_include_HEADERS = hardware/CryptoAPI.h \
+              hardware/MetadataBufferType.h \
+              hardware/HardwareAPI.h \
+              hardware/HDCPAPI.h \
+              hardware/OMXPluginBase.h \
+              hardware/VideoAPI.h
+
+hardware_includedir = $(includedir)/media/hardware/
