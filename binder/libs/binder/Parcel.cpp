@@ -788,6 +788,10 @@ status_t Parcel::writeByteArray(size_t len, const uint8_t *val) {
     return ret;
 }
 
+status_t Parcel::writeBool(bool val)
+{
+    return writeInt32(int32_t(val));
+}
 status_t Parcel::writeInt64(int64_t val)
 {
     return writeAligned(val);
@@ -1278,6 +1282,18 @@ intptr_t Parcel::readIntPtr() const
     return readAligned<intptr_t>();
 }
 
+status_t Parcel::readBool(bool *pArg) const
+{
+    int32_t tmp = 0;
+    status_t ret = readInt32(&tmp);
+    *pArg = (tmp != 0);
+    return ret;
+}
+
+bool Parcel::readBool() const
+{
+    return readInt32() != 0;
+}
 
 const char* Parcel::readCString() const
 {
