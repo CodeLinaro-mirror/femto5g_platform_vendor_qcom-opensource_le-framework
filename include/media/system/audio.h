@@ -803,6 +803,7 @@ enum {
     AUDIO_DEVICE_OUT_BUS                       = 0x1000000,
     AUDIO_DEVICE_OUT_PROXY                     = 0x2000000,
     AUDIO_DEVICE_OUT_USB_HEADSET               = 0x4000000,
+    AUDIO_DEVICE_OUT_ECHO_CANCELLER            = 0x10000000,
     AUDIO_DEVICE_OUT_DEFAULT                   = AUDIO_DEVICE_BIT_DEFAULT,
     AUDIO_DEVICE_OUT_ALL      = (AUDIO_DEVICE_OUT_EARPIECE |
                                  AUDIO_DEVICE_OUT_SPEAKER |
@@ -820,6 +821,7 @@ enum {
                                  AUDIO_DEVICE_OUT_USB_ACCESSORY |
                                  AUDIO_DEVICE_OUT_USB_DEVICE |
                                  AUDIO_DEVICE_OUT_USB_HEADSET |
+                                 AUDIO_DEVICE_OUT_ECHO_CANCELLER |
                                  AUDIO_DEVICE_OUT_REMOTE_SUBMIX |
                                  AUDIO_DEVICE_OUT_TELEPHONY_TX |
                                  AUDIO_DEVICE_OUT_LINE |
