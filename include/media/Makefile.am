@@ -1,7 +1,17 @@
 sys_includedir = $(includedir)/system/
+if ANDROID_Q_AUDIO_SUPPORT
+sys_include_HEADERS = system/audio_android_q/sound_trigger.h \
+            system/audio_android_q/audio.h \
+            system/audio_android_q/audio-base.h \
+            system/audio_android_q/audio-base-utils.h \
+            system/audio_android_q/audio_effect.h \
+            system/audio_android_q/audio_effect-base.h \
+            system/audio_android_q/audio_policy.h
+else
 sys_include_HEADERS = system/sound_trigger.h \
             system/audio.h \
             system/audio_policy.h
+endif
 
 audeffect_include_HEADERS = audio_effects/audio_effects_conf.h \
             audio_effects/effect_aec.h \

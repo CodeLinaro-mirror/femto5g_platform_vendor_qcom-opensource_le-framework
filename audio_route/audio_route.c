@@ -479,7 +479,9 @@ static void start_tag(void *data, const XML_Char *tag_name,
                 struct mixer_path *sub_path = path_get_by_name(ar, attr_name);
                 if (!sub_path) {
                     ALOGE("unable to find sub path '%s'", attr_name);
-                } else {
+                } else if (!state->path) {
+                    ALOGE("state->path is NULL");
+                }else {
                     path_add_path(ar, state->path, sub_path);
                 }
             }
