@@ -1,5 +1,5 @@
 BUILD_COMPONENTS :=
 
-BUILD_COMPONENTS += camera media/mtp
+BUILD_COMPONENTS += media/mtp
 
 SUBDIRS := $(BUILD_COMPONENTS)
