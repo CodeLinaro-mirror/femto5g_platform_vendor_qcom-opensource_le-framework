@@ -487,6 +487,12 @@ enum {
                                   AUDIO_CHANNEL_OUT_LOW_FREQUENCY |
                                   AUDIO_CHANNEL_OUT_SIDE_LEFT |
                                   AUDIO_CHANNEL_OUT_SIDE_RIGHT),
+    AUDIO_CHANNEL_OUT_4POINT1POINT4 = (AUDIO_CHANNEL_OUT_QUAD |
+                                  AUDIO_CHANNEL_OUT_LOW_FREQUENCY |
+                                  AUDIO_CHANNEL_OUT_SIDE_LEFT |
+                                  AUDIO_CHANNEL_OUT_SIDE_RIGHT |
+                                  AUDIO_CHANNEL_OUT_TOP_BACK_LEFT |
+                                  AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT),
     AUDIO_CHANNEL_OUT_5POINT1POINT2 = (AUDIO_CHANNEL_OUT_5POINT1 |
                                        AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT |
                                        AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT),
@@ -497,6 +503,30 @@ enum {
                                   AUDIO_CHANNEL_OUT_BACK_LEFT |
                                   AUDIO_CHANNEL_OUT_BACK_RIGHT |
                                   AUDIO_CHANNEL_OUT_BACK_CENTER),
+    AUDIO_CHANNEL_OUT_6POINT1POINT4 = (AUDIO_CHANNEL_OUT_FRONT_LEFT |
+                                  AUDIO_CHANNEL_OUT_FRONT_RIGHT |
+                                  AUDIO_CHANNEL_OUT_LOW_FREQUENCY |
+                                  AUDIO_CHANNEL_OUT_BACK_LEFT |
+                                  AUDIO_CHANNEL_OUT_BACK_RIGHT |
+                                  AUDIO_CHANNEL_OUT_SIDE_LEFT |
+                                  AUDIO_CHANNEL_OUT_SIDE_RIGHT |
+                                  AUDIO_CHANNEL_OUT_TOP_FRONT_LEFT |
+                                  AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT |
+                                  AUDIO_CHANNEL_OUT_TOP_BACK_LEFT |
+                                  AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT),
+    AUDIO_CHANNEL_OUT_8POINT1POINT4 = (AUDIO_CHANNEL_OUT_FRONT_LEFT |
+                                  AUDIO_CHANNEL_OUT_FRONT_RIGHT |
+                                  AUDIO_CHANNEL_OUT_FRONT_CENTER |
+                                  AUDIO_CHANNEL_OUT_LOW_FREQUENCY |
+                                  AUDIO_CHANNEL_OUT_BACK_LEFT |
+                                  AUDIO_CHANNEL_OUT_BACK_RIGHT |
+                                  AUDIO_CHANNEL_OUT_BACK_CENTER |
+                                  AUDIO_CHANNEL_OUT_SIDE_LEFT |
+                                  AUDIO_CHANNEL_OUT_SIDE_RIGHT |
+                                  AUDIO_CHANNEL_OUT_TOP_FRONT_LEFT |
+                                  AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT |
+                                  AUDIO_CHANNEL_OUT_TOP_BACK_LEFT |
+                                  AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT),
     // matches the correct AudioFormat.CHANNEL_OUT_7POINT1_SURROUND definition for 7.1
     AUDIO_CHANNEL_OUT_7POINT1  = (AUDIO_CHANNEL_OUT_FRONT_LEFT |
                                   AUDIO_CHANNEL_OUT_FRONT_RIGHT |
@@ -524,6 +554,21 @@ enum {
     AUDIO_CHANNEL_OUT_9POINT1POINT6  = (AUDIO_CHANNEL_OUT_7POINT1POINT4 |
                                   AUDIO_CHANNEL_OUT_WIDE_LEFT |
                                   AUDIO_CHANNEL_OUT_WIDE_RIGHT |
+                                  AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT |
+                                  AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT),
+    AUDIO_CHANNEL_OUT_8POINT1POINT6 = (AUDIO_CHANNEL_OUT_FRONT_LEFT |
+                                  AUDIO_CHANNEL_OUT_FRONT_RIGHT |
+                                  AUDIO_CHANNEL_OUT_FRONT_CENTER |
+                                  AUDIO_CHANNEL_OUT_LOW_FREQUENCY |
+                                  AUDIO_CHANNEL_OUT_BACK_LEFT |
+                                  AUDIO_CHANNEL_OUT_BACK_RIGHT |
+                                  AUDIO_CHANNEL_OUT_BACK_CENTER |
+                                  AUDIO_CHANNEL_OUT_SIDE_LEFT |
+                                  AUDIO_CHANNEL_OUT_SIDE_RIGHT |
+                                  AUDIO_CHANNEL_OUT_TOP_FRONT_LEFT |
+                                  AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT |
+                                  AUDIO_CHANNEL_OUT_TOP_BACK_LEFT |
+                                  AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT |
                                   AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT |
                                   AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT),
     // combined 9.1.6 plus 2 extra channels
@@ -1642,14 +1687,26 @@ static inline audio_channel_mask_t audio_channel_out_mask_from_count(uint32_t ch
     case 8: // 7.1
         bits = AUDIO_CHANNEL_OUT_7POINT1;
         break;
+    case 9: //4.1.4
+        bits = AUDIO_CHANNEL_OUT_4POINT1POINT4;
+        break;
     case 10: // 7.1.2
         bits = AUDIO_CHANNEL_OUT_7POINT1POINT2;
+        break;
+    case 11: //6.1.4
+        bits = AUDIO_CHANNEL_OUT_6POINT1POINT4;
         break;
     case 12: // 7.1.4
         bits = AUDIO_CHANNEL_OUT_7POINT1POINT4;
         break;
+    case 13: //8.1.4
+        bits = AUDIO_CHANNEL_OUT_8POINT1POINT4;
+        break;
     case 14: // 9.1.4
         bits = AUDIO_CHANNEL_OUT_9POINT1POINT4;
+        break;
+    case 15: //8.1.6
+        bits = AUDIO_CHANNEL_OUT_8POINT1POINT6;
         break;
     case 16: // 9.1.6
         bits = AUDIO_CHANNEL_OUT_9POINT1POINT6;
