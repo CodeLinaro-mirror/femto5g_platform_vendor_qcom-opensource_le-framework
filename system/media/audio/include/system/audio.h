@@ -168,14 +168,16 @@ typedef enum {
     AUDIO_SOURCE_UNPROCESSED         = 9, /* Source for unprocessed sound.
                                           Usage examples include level measurement and raw
                                           signal analysis. */
-    AUDIO_SOURCE_CNT,
-    AUDIO_SOURCE_MAX                 = AUDIO_SOURCE_CNT - 1,
+    AUDIO_SOURCE_VOICE_PERFORMANCE   = 10,
+    AUDIO_SOURCE_ECHO_REFERENCE      = 1997,
     AUDIO_SOURCE_FM_TUNER            = 1998,
     AUDIO_SOURCE_HOTWORD             = 1999, /* A low-priority, preemptible audio source for
                                                 for background software hotword detection.
                                                 Same tuning as AUDIO_SOURCE_VOICE_RECOGNITION.
                                                 Used only internally to the framework. Not exposed
                                                 at the audio HAL. */
+    AUDIO_SOURCE_CNT,
+    AUDIO_SOURCE_MAX                 = AUDIO_SOURCE_CNT - 1,
 } audio_source_t;
 
 /* Audio attributes */
@@ -448,6 +450,8 @@ enum {
     AUDIO_CHANNEL_OUT_WIDE_RIGHT            = 0x200000u,
     AUDIO_CHANNEL_OUT_BACK_LEFT_OF_CENTER   = 0x400000u,
     AUDIO_CHANNEL_OUT_BACK_RIGHT_OF_CENTER  = 0x800000u,
+    AUDIO_CHANNEL_OUT_HAPTIC_A              = 0x20000000u,
+    AUDIO_CHANNEL_OUT_HAPTIC_B              = 0x10000000u,
 
 /* TODO: should these be considered complete channel masks, or only bits? */
 
@@ -653,6 +657,8 @@ enum {
                                AUDIO_CHANNEL_IN_Z_AXIS |
                                AUDIO_CHANNEL_IN_VOICE_UPLINK |
                                AUDIO_CHANNEL_IN_VOICE_DNLINK),
+    AUDIO_CHANNEL_HAPTIC_ALL  = AUDIO_CHANNEL_OUT_HAPTIC_B |
+                                AUDIO_CHANNEL_OUT_HAPTIC_A,
 };
 
 /* A channel mask per se only defines the presence or absence of a channel, not the order.
@@ -852,6 +858,7 @@ enum {
     AUDIO_DEVICE_OUT_BUS                       = 0x1000000,
     AUDIO_DEVICE_OUT_PROXY                     = 0x2000000,
     AUDIO_DEVICE_OUT_USB_HEADSET               = 0x4000000,
+    AUDIO_DEVICE_OUT_HEARING_AID               = 0x8000000u,
     AUDIO_DEVICE_OUT_ECHO_CANCELLER            = 0x10000000,
     AUDIO_DEVICE_OUT_DEFAULT                   = AUDIO_DEVICE_BIT_DEFAULT,
     AUDIO_DEVICE_OUT_ALL      = (AUDIO_DEVICE_OUT_EARPIECE |
@@ -1098,6 +1105,9 @@ typedef struct {
     uint8_t TTP_TWS_high;
     uint32_t bits_per_sample;
     uint16_t aptx_mode;
+    uint32_t input_mode;
+    uint32_t fade_duration;
+    uint8_t  sink_cap[11];
 } audio_aptx_ad_config;
 
 /* Information about BT APTX encoder configuration
@@ -1284,6 +1294,13 @@ typedef int audio_port_handle_t;
 /* maximum audio device address length */
 #define AUDIO_DEVICE_MAX_ADDRESS_LEN 32
 
+typedef enum {
+    MIC_DIRECTION_UNSPECIFIED = 0,
+    MIC_DIRECTION_FRONT = 1,
+    MIC_DIRECTION_BACK = 2,
+    MIC_DIRECTION_EXTERNAL = 3,
+} audio_microphone_direction_t;
+
 /* extension for audio port configuration structure when the audio port is a
  * hardware device */
 struct audio_port_config_device_ext {
@@ -1447,6 +1464,23 @@ struct audio_mmap_position {
     int32_t  position_frames;  /**< increasing 32 bit frame count reset when stream->stop()
                                     is called */
 };
+
+/** Metadata of a playback track for an in stream. */
+typedef struct playback_track_metadata {
+    audio_usage_t usage;
+    audio_content_type_t content_type;
+    float gain; // Normalized linear volume. 0=silence, 1=0dbfs...
+} playback_track_metadata_t;
+
+/** Metadata of a record track for an out stream. */
+typedef struct record_track_metadata {
+    audio_source_t source;
+    float gain; // Normalized linear volume. 0=silence, 1=0dbfs...
+    // For record tracks originating from a software patch, the dest_device
+    // fields provide information about the downstream device.
+    audio_devices_t dest_device;
+    char dest_device_address[AUDIO_DEVICE_MAX_ADDRESS_LEN];
+} record_track_metadata_t;
 
 static inline bool audio_is_output_device(audio_devices_t device)
 {
