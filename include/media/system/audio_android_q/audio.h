@@ -566,6 +566,93 @@ struct audio_patch {
 };
 
 
+/* Information about BT SBC encoder configuration
+ * This data is used between audio HAL module and
+ * BT IPC library to configure DSP encoder
+ */
+typedef struct {
+    uint32_t subband;    /* 4, 8 */
+    uint32_t blk_len;    /* 4, 8, 12, 16 */
+    uint16_t sampling_rate; /*44.1khz,48khz*/
+    uint8_t  channels;      /*0(Mono),1(Dual_mono),2(Stereo),3(JS)*/
+    uint8_t  alloc;         /*0(Loudness),1(SNR)*/
+    uint8_t  min_bitpool;   /* 2 */
+    uint8_t  max_bitpool;   /*53(44.1khz),51 (48khz) */
+    uint32_t bitrate;      /* 320kbps to 512kbps */
+    uint32_t bits_per_sample;
+} audio_sbc_encoder_config;
+
+/* Information about BT APTX encoder configuration
+ * This data is used between audio HAL module and
+ * BT IPC library to configure DSP encoder
+ * for Classic and HD aptx mode
+ */
+typedef struct {
+    uint16_t sampling_rate;
+    uint8_t  channels;
+    uint32_t bitrate;
+    uint32_t bits_per_sample;
+} audio_aptx_default_config;
+
+/* Define audio_aptx_encoder_config
+ * to maintain backward compatibility on bthost side
+ */
+typedef audio_aptx_default_config audio_aptx_encoder_config;
+
+/* Information about BT APTX ADAPTIVE encoder configuration
+ * This data is used between audio HAL module and
+ * BT IPC library to configure DSP encoder
+ * for HQ and LL mode
+ */
+typedef struct {
+    uint8_t sampling_rate;
+    uint8_t  channel_mode;
+    uint16_t mtu;
+    uint8_t min_sink_buffering_LL;
+    uint8_t max_sink_buffering_LL;
+    uint8_t min_sink_buffering_HQ;
+    uint8_t max_sink_buffering_HQ;
+    uint8_t min_sink_buffering_TWS;
+    uint8_t max_sink_buffering_TWS;
+    uint8_t TTP_LL_low;
+    uint8_t TTP_LL_high;
+    uint8_t TTP_HQ_low;
+    uint8_t TTP_HQ_high;
+    uint8_t TTP_TWS_low;
+    uint8_t TTP_TWS_high;
+    uint32_t bits_per_sample;
+    uint16_t aptx_mode;
+    uint32_t input_mode;
+    uint32_t fade_duration;
+    uint8_t  sink_cap[11];
+} audio_aptx_ad_config;
+
+/* Information about BT APTX encoder configuration
+ * This data is used between audio HAL module and
+ * BT IPC library to configure DSP encoder
+ * for TWS in dual mono scenario
+ */
+typedef struct {
+    uint16_t sampling_rate;
+    uint8_t  channels;
+    uint32_t bitrate;
+    uint8_t sync_mode;
+    uint32_t bits_per_sample;
+} audio_aptx_dual_mono_config;
+
+/* Information about BT AAC encoder configuration
+ * This data is used between audio HAL module and
+ * BT IPC library to configure DSP encoder
+ */
+typedef struct {
+    uint32_t enc_mode; /* LC, SBR, PS */
+    uint16_t format_flag; /* RAW, ADTS */
+    uint16_t channels; /* 1-Mono, 2-Stereo */
+    uint32_t sampling_rate;
+    uint32_t bitrate;
+    uint32_t bits_per_sample;
+} audio_aac_encoder_config;
+
 
 /* a HW synchronization source returned by the audio HAL */
 typedef uint32_t audio_hw_sync_t;
