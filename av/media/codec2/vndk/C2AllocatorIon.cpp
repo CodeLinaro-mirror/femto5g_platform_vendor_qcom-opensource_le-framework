@@ -21,6 +21,8 @@
 #include <list>
 
 #include <ion/ion.h>
+#include <linux/msm_ion.h>
+
 #include <sys/mman.h>
 #include <unistd.h> // getpagesize, size_t, close, dup
 
@@ -29,6 +31,10 @@
 #include <C2Debug.h>
 #include <C2ErrnoUtils.h>
 #include <C2HandleIonInternal.h>
+
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
 
 namespace android {
 
@@ -240,6 +246,7 @@ public:
                 (void)munmap(map.addr, map.size);
             }
         }
+
         if (mMapFd >= 0) {
             close(mMapFd);
             mMapFd = -1;
@@ -556,13 +563,18 @@ c2_status_t C2AllocatorIon::newLinearAllocation(
     }
 
     size_t align = 0;
+#ifdef _LINUX_
+    c2_status_t ret = C2_OK;
+    unsigned flags = 0;
+    unsigned heapMask = ION_HEAP(ION_SYSTEM_HEAP_ID);
+#else
     unsigned heapMask = ~0;
     unsigned flags = 0;
     c2_status_t ret = mapUsage(usage, capacity, &align, &heapMask, &flags);
     if (ret && ret != C2_NO_INIT) {
         return ret;
     }
-
+#endif
     std::shared_ptr<C2AllocationIon> alloc
         = std::make_shared<C2AllocationIon>(dup(mIonFd), capacity, align, heapMask, flags, getId());
     ret = alloc->status();

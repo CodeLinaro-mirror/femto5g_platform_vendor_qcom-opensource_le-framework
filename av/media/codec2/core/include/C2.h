@@ -21,6 +21,10 @@
 
 #include <string>
 
+#ifndef __unused
+#define __unused __attribute__((__unused__))
+#endif
+
 /** nanoseconds with arbitrary origin. */
 typedef int64_t c2_nsecs_t;
 

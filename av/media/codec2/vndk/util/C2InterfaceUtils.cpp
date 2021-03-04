@@ -32,7 +32,7 @@
 #include <map>
 #include <type_traits>
 
-#include <android-base/stringprintf.h>
+#include <util/C2Debug-log.h>
 
 std::ostream& operator<<(std::ostream& os, const _C2FieldId &i);
 

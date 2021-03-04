@@ -24,4 +24,8 @@
 // TODO: implement base debug utils
 #endif
 
+#ifdef _LINUX_
+#include <linux-C2Debug-log.h>
+#endif
+
 #endif  // C2UTILS_DEBUG_LOG_H_

@@ -17,21 +17,7 @@
 #ifndef ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
 #define ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
 
-#include <android/hardware/graphics/bufferqueue/2.0/IGraphicBufferProducer.h>
-
 #include <C2Buffer.h>
-
-namespace android {
-namespace hardware {
-namespace media {
-namespace bufferpool {
-
-struct BufferPoolData;
-
-}
-}
-}
-}
 
 /**
  * Stores informations from C2BlockPool implementations which are required by C2Block.
@@ -134,46 +120,6 @@ struct _C2BlockFactory {
     std::shared_ptr<C2GraphicBlock> CreateGraphicBlock(
             const C2Handle *handle);
 
-    /**
-     * Create a linear block from the received bufferpool data.
-     *
-     * \param data  bufferpool data to a linear block
-     *
-     * \return shared pointer to the linear block. nullptr if there was not enough memory to
-     *         create this block.
-     */
-    static
-    std::shared_ptr<C2LinearBlock> CreateLinearBlock(
-            const C2Handle *handle,
-            const std::shared_ptr<android::hardware::media::bufferpool::BufferPoolData> &data);
-
-    /**
-     * Create a graphic block from the received bufferpool data.
-     *
-     * \param data  bufferpool data to a graphic block
-     *
-     * \return shared pointer to the graphic block. nullptr if there was not enough memory to
-     *         create this block.
-     */
-    static
-    std::shared_ptr<C2GraphicBlock> CreateGraphicBlock(
-            const C2Handle *handle,
-            const std::shared_ptr<android::hardware::media::bufferpool::BufferPoolData> &data);
-
-    /**
-     * Get bufferpool data from the blockpool data.
-     *
-     * \param poolData          blockpool data
-     * \param bufferPoolData    pointer to bufferpool data where the bufferpool
-     *                          data is stored.
-     *
-     * \return {\code true} when there is valid bufferpool data, {\code false} otherwise.
-     */
-    static
-    bool GetBufferPoolData(
-            const std::shared_ptr<const _C2BlockPoolData> &poolData,
-            std::shared_ptr<android::hardware::media::bufferpool::BufferPoolData> *bufferPoolData);
-
     /*
      * Life Cycle Management of BufferQueue-Based Blocks
      * =================================================
@@ -267,29 +213,6 @@ struct _C2BlockFactory {
             int32_t* bqSlot = nullptr);
 
     /**
-     * Hold a block from the designated bufferqueue. This causes the destruction
-     * of the block to trigger a call to cancelBuffer().
-     *
-     * This function assumes that \p poolData comes from a bufferqueue-based
-     * block. It does not check if that is the case.
-     *
-     * \param poolData blockpool data associated to the block.
-     * \param owner    block owner from client bufferqueue manager.
-     *                 If this is expired, the block is not owned by client
-     *                 anymore.
-     * \param igbp     \c IGraphicBufferProducer instance to be assigned to the
-     *                 block. This is not needed when the block is local.
-     *
-     * \return The previous held status.
-     */
-    static
-    bool HoldBlockFromBufferQueue(
-            const std::shared_ptr<_C2BlockPoolData>& poolData,
-            const std::shared_ptr<int>& owner,
-            const ::android::sp<::android::hardware::graphics::bufferqueue::
-                                V2_0::IGraphicBufferProducer>& igbp = nullptr);
-
-    /**
      * Prepare a block to be transferred to other process. This blocks
      * bufferqueue migration from happening. The block should be in held.
      *
@@ -337,43 +260,6 @@ struct _C2BlockFactory {
      */
     static
     bool BeginAttachBlockToBufferQueue(
-            const std::shared_ptr<_C2BlockPoolData>& poolData);
-
-    /**
-     * Called after migration of the specified block is finished. Make sure
-     * that BeginAttachBlockToBufferQueue() was called before this call.
-     *
-     * This will unblock rendering. if redering is tried during migration,
-     * this returns false. In that case, cancelBuffer() should be called.
-     * This function assumes that \p poolData comes from a bufferqueue-based
-     * block. It does not check if that is the case.
-     *
-     * \param poolData blockpool data associated to the block.
-     *
-     * \return true if migration is eligible, false otherwise.
-     */
-    static
-    bool EndAttachBlockToBufferQueue(
-            const std::shared_ptr<_C2BlockPoolData>& poolData,
-            const std::shared_ptr<int>& owner,
-            const ::android::sp<::android::hardware::graphics::bufferqueue::
-                                V2_0::IGraphicBufferProducer>& igbp,
-            uint32_t generation,
-            uint64_t bqId,
-            int32_t bqSlot);
-
-    /**
-     * Indicates a block to be rendered very soon.
-     *
-     * This function assumes that \p poolData comes from a bufferqueue-based
-     * block. It does not check if that is the case.
-     *
-     * \param poolData blockpool data associated to the block.
-     *
-     * \return true if migration is eligible, false otherwise.
-     */
-    static
-    bool DisplayBlockToBufferQueue(
             const std::shared_ptr<_C2BlockPoolData>& poolData);
 };
 

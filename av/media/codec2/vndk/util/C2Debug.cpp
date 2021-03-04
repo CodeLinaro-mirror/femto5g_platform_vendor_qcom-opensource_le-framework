@@ -21,9 +21,7 @@
 
 #include <iostream>
 
-#include <android-base/stringprintf.h>
-
-using android::base::StringPrintf;
+#include <util/C2Debug-log.h>
 
 /* -------------------------------- asString -------------------------------- */
 

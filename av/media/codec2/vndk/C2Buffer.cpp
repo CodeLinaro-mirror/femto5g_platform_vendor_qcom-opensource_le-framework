@@ -14,34 +14,13 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
-#define LOG_TAG "C2Buffer"
-#include <utils/Log.h>
-
 #include <list>
 #include <map>
 #include <mutex>
 
-#include <C2AllocatorBlob.h>
-#include <C2AllocatorGralloc.h>
-#include <C2AllocatorIon.h>
-#include <C2BufferPriv.h>
 #include <C2BlockInternal.h>
 #include <C2PlatformSupport.h>
-#include <bufferpool/ClientManager.h>
 
-namespace {
-
-using android::C2AllocatorBlob;
-using android::C2AllocatorGralloc;
-using android::C2AllocatorIon;
-using android::hardware::media::bufferpool::BufferPoolData;
-using android::hardware::media::bufferpool::V2_0::ResultStatus;
-using android::hardware::media::bufferpool::V2_0::implementation::BufferPoolAllocation;
-using android::hardware::media::bufferpool::V2_0::implementation::BufferPoolAllocator;
-using android::hardware::media::bufferpool::V2_0::implementation::ClientManager;
-using android::hardware::media::bufferpool::V2_0::implementation::ConnectionId;
-using android::hardware::media::bufferpool::V2_0::implementation::INVALID_CONNECTIONID;
 
 // This anonymous namespace contains the helper classes that allow our implementation to create
 // block/buffer objects.
@@ -64,7 +43,6 @@ class ConstLinearBlockBuddy : public C2ConstLinearBlock {
 
 class LinearBlockBuddy : public C2LinearBlock {
     using C2LinearBlock::C2LinearBlock;
-    friend class ::C2BasicLinearBlockPool;
 };
 
 class AcquirableReadViewBuddy : public C2Acquirable<C2ReadView> {
@@ -100,15 +78,12 @@ class ConstGraphicBlockBuddy : public C2ConstGraphicBlock {
 
 class GraphicBlockBuddy : public C2GraphicBlock {
     using C2GraphicBlock::C2GraphicBlock;
-    friend class ::C2BasicGraphicBlockPool;
 };
 
 class BufferDataBuddy : public C2BufferData {
     using C2BufferData::C2BufferData;
     friend class ::C2Buffer;
 };
-
-}  // namespace
 
 /* ========================================== 1D BLOCK ========================================= */
 
@@ -297,6 +272,7 @@ C2ConstLinearBlock C2ConstLinearBlock::subBlock(size_t offset_, size_t size_) co
     return C2ConstLinearBlock(mImpl, subRange, mFence);
 }
 
+
 /**
  * Linear block implementation.
  */
@@ -326,491 +302,6 @@ C2ConstLinearBlock C2LinearBlock::share(size_t offset_, size_t size_, C2Fence fe
     return ConstLinearBlockBuddy(mImpl, C2LinearRange(*this, offset_, size_), fence);
 }
 
-C2BasicLinearBlockPool::C2BasicLinearBlockPool(
-        const std::shared_ptr<C2Allocator> &allocator)
-  : mAllocator(allocator) { }
-
-c2_status_t C2BasicLinearBlockPool::fetchLinearBlock(
-        uint32_t capacity,
-        C2MemoryUsage usage,
-        std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
-    block->reset();
-
-    std::shared_ptr<C2LinearAllocation> alloc;
-    c2_status_t err = mAllocator->newLinearAllocation(capacity, usage, &alloc);
-    if (err != C2_OK) {
-        return err;
-    }
-
-    *block = _C2BlockFactory::CreateLinearBlock(alloc);
-
-    return C2_OK;
-}
-
-struct C2_HIDE C2PooledBlockPoolData : _C2BlockPoolData {
-
-    virtual type_t getType() const override {
-        return TYPE_BUFFERPOOL;
-    }
-
-    void getBufferPoolData(std::shared_ptr<BufferPoolData> *data) const {
-        *data = mData;
-    }
-
-    C2PooledBlockPoolData(const std::shared_ptr<BufferPoolData> &data) : mData(data) {}
-
-    virtual ~C2PooledBlockPoolData() override {}
-
-private:
-    std::shared_ptr<BufferPoolData> mData;
-};
-
-bool _C2BlockFactory::GetBufferPoolData(
-        const std::shared_ptr<const _C2BlockPoolData> &data,
-        std::shared_ptr<BufferPoolData> *bufferPoolData) {
-    if (data && data->getType() == _C2BlockPoolData::TYPE_BUFFERPOOL) {
-        const std::shared_ptr<const C2PooledBlockPoolData> poolData =
-                std::static_pointer_cast<const C2PooledBlockPoolData>(data);
-        poolData->getBufferPoolData(bufferPoolData);
-        return true;
-    }
-    return false;
-}
-
-std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
-        const std::shared_ptr<C2LinearAllocation> &alloc,
-        const std::shared_ptr<_C2BlockPoolData> &data, size_t offset, size_t size) {
-    std::shared_ptr<C2Block1D::Impl> impl =
-        std::make_shared<C2Block1D::Impl>(alloc, data, offset, size);
-    return std::shared_ptr<C2LinearBlock>(new C2LinearBlock(impl, *impl));
-}
-
-std::shared_ptr<_C2BlockPoolData> _C2BlockFactory::GetLinearBlockPoolData(
-        const C2Block1D &block) {
-    if (block.mImpl) {
-        return block.mImpl->poolData();
-    }
-    return nullptr;
-}
-
-std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
-        const C2Handle *handle) {
-    // TODO: get proper allocator? and mutex?
-    static std::unique_ptr<C2Allocator> sAllocator = []{
-        std::unique_ptr<C2Allocator> allocator;
-        if (android::GetPreferredLinearAllocatorId(android::GetCodec2PoolMask()) ==
-                android::C2PlatformAllocatorStore::BLOB) {
-            allocator = std::make_unique<C2AllocatorBlob>(android::C2PlatformAllocatorStore::BLOB);
-        } else {
-            allocator = std::make_unique<C2AllocatorIon>(android::C2PlatformAllocatorStore::ION);
-        }
-        return allocator;
-    }();
-
-    if (sAllocator == nullptr)
-        return nullptr;
-
-    bool isValidHandle = false;
-    if (sAllocator->getId() == android::C2PlatformAllocatorStore::BLOB) {
-        isValidHandle = C2AllocatorBlob::isValid(handle);
-    } else {
-        isValidHandle = C2AllocatorIon::isValid(handle);
-    }
-
-    std::shared_ptr<C2LinearAllocation> alloc;
-    if (isValidHandle) {
-        c2_status_t err = sAllocator->priorLinearAllocation(handle, &alloc);
-        if (err == C2_OK) {
-            std::shared_ptr<C2LinearBlock> block = _C2BlockFactory::CreateLinearBlock(alloc);
-            return block;
-        }
-    }
-    return nullptr;
-}
-
-std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
-        const C2Handle *cHandle, const std::shared_ptr<BufferPoolData> &data) {
-    // TODO: get proper allocator? and mutex?
-    static std::unique_ptr<C2Allocator> sAllocator = []{
-        std::unique_ptr<C2Allocator> allocator;
-        if (android::GetPreferredLinearAllocatorId(android::GetCodec2PoolMask()) ==
-                android::C2PlatformAllocatorStore::BLOB) {
-            allocator = std::make_unique<C2AllocatorBlob>(android::C2PlatformAllocatorStore::BLOB);
-        } else {
-            allocator = std::make_unique<C2AllocatorIon>(android::C2PlatformAllocatorStore::ION);
-        }
-        return allocator;
-    }();
-
-    if (sAllocator == nullptr)
-        return nullptr;
-
-    bool isValidHandle = false;
-    if (sAllocator->getId() == android::C2PlatformAllocatorStore::BLOB) {
-        isValidHandle = C2AllocatorBlob::isValid(cHandle);
-    } else {
-        isValidHandle = C2AllocatorIon::isValid(cHandle);
-    }
-
-    std::shared_ptr<C2LinearAllocation> alloc;
-    if (isValidHandle) {
-        c2_status_t err = sAllocator->priorLinearAllocation(cHandle, &alloc);
-        const std::shared_ptr<C2PooledBlockPoolData> poolData =
-                std::make_shared<C2PooledBlockPoolData>(data);
-        if (err == C2_OK && poolData) {
-            // TODO: config params?
-            std::shared_ptr<C2LinearBlock> block =
-                    _C2BlockFactory::CreateLinearBlock(alloc, poolData);
-            return block;
-        }
-    }
-    return nullptr;
-};
-
-/**
- * Wrapped C2Allocator which is injected to buffer pool on behalf of
- * C2BlockPool.
- */
-class _C2BufferPoolAllocator : public BufferPoolAllocator {
-public:
-    _C2BufferPoolAllocator(const std::shared_ptr<C2Allocator> &allocator)
-        : mAllocator(allocator) {}
-
-    ~_C2BufferPoolAllocator() override {}
-
-    ResultStatus allocate(const std::vector<uint8_t> &params,
-                          std::shared_ptr<BufferPoolAllocation> *alloc,
-                          size_t *allocSize) override;
-
-    bool compatible(const std::vector<uint8_t> &newParams,
-                    const std::vector<uint8_t> &oldParams) override;
-
-    // Methods for codec2 component (C2BlockPool).
-    /**
-     * Transforms linear allocation parameters for C2Allocator to parameters
-     * for buffer pool.
-     *
-     * @param capacity      size of linear allocation
-     * @param usage         memory usage pattern for linear allocation
-     * @param params        allocation parameters for buffer pool
-     */
-    void getLinearParams(uint32_t capacity, C2MemoryUsage usage,
-                         std::vector<uint8_t> *params);
-
-    /**
-     * Transforms graphic allocation parameters for C2Allocator to parameters
-     * for buffer pool.
-     *
-     * @param width         width of graphic allocation
-     * @param height        height of graphic allocation
-     * @param format        color format of graphic allocation
-     * @param params        allocation parameter for buffer pool
-     */
-    void getGraphicParams(uint32_t width, uint32_t height,
-                          uint32_t format, C2MemoryUsage usage,
-                          std::vector<uint8_t> *params);
-
-    /**
-     * Transforms an existing native handle to an C2LinearAllcation.
-     * Wrapper to C2Allocator#priorLinearAllocation
-     */
-    c2_status_t priorLinearAllocation(
-            const C2Handle *handle,
-            std::shared_ptr<C2LinearAllocation> *c2Allocation);
-
-    /**
-     * Transforms an existing native handle to an C2GraphicAllcation.
-     * Wrapper to C2Allocator#priorGraphicAllocation
-     */
-    c2_status_t priorGraphicAllocation(
-            const C2Handle *handle,
-            std::shared_ptr<C2GraphicAllocation> *c2Allocation);
-
-private:
-    static constexpr int kMaxIntParams = 5; // large enough number;
-
-    enum AllocType : uint8_t {
-        ALLOC_NONE = 0,
-
-        ALLOC_LINEAR,
-        ALLOC_GRAPHIC,
-    };
-
-    union AllocParams {
-        struct {
-            AllocType allocType;
-            C2MemoryUsage usage;
-            uint32_t params[kMaxIntParams];
-        } data;
-        uint8_t array[0];
-
-        AllocParams() : data{ALLOC_NONE, {0, 0}, {0}} {}
-        AllocParams(C2MemoryUsage usage, uint32_t capacity)
-            : data{ALLOC_LINEAR, usage, {[0] = capacity}} {}
-        AllocParams(
-                C2MemoryUsage usage,
-                uint32_t width, uint32_t height, uint32_t format)
-                : data{ALLOC_GRAPHIC, usage, {width, height, format}} {}
-    };
-
-    const std::shared_ptr<C2Allocator> mAllocator;
-};
-
-struct LinearAllocationDtor {
-    LinearAllocationDtor(const std::shared_ptr<C2LinearAllocation> &alloc)
-        : mAllocation(alloc) {}
-
-    void operator()(BufferPoolAllocation *poolAlloc) { delete poolAlloc; }
-
-    const std::shared_ptr<C2LinearAllocation> mAllocation;
-};
-
-struct GraphicAllocationDtor {
-    GraphicAllocationDtor(const std::shared_ptr<C2GraphicAllocation> &alloc)
-        : mAllocation(alloc) {}
-
-    void operator()(BufferPoolAllocation *poolAlloc) { delete poolAlloc; }
-
-    const std::shared_ptr<C2GraphicAllocation> mAllocation;
-};
-
-ResultStatus _C2BufferPoolAllocator::allocate(
-        const std::vector<uint8_t>  &params,
-        std::shared_ptr<BufferPoolAllocation> *alloc,
-        size_t *allocSize) {
-    AllocParams c2Params;
-    memcpy(&c2Params, params.data(), std::min(sizeof(AllocParams), params.size()));
-    c2_status_t status = C2_BAD_VALUE;
-    switch(c2Params.data.allocType) {
-        case ALLOC_NONE:
-            break;
-        case ALLOC_LINEAR: {
-            std::shared_ptr<C2LinearAllocation> c2Linear;
-            status = mAllocator->newLinearAllocation(
-                    c2Params.data.params[0], c2Params.data.usage, &c2Linear);
-            if (status == C2_OK && c2Linear) {
-                BufferPoolAllocation *ptr = new BufferPoolAllocation(c2Linear->handle());
-                if (ptr) {
-                    *alloc = std::shared_ptr<BufferPoolAllocation>(
-                            ptr, LinearAllocationDtor(c2Linear));
-                    if (*alloc) {
-                        *allocSize = (size_t)c2Params.data.params[0];
-                        return ResultStatus::OK;
-                    }
-                    delete ptr;
-                }
-                return ResultStatus::NO_MEMORY;
-            }
-            break;
-        }
-        case ALLOC_GRAPHIC: {
-            std::shared_ptr<C2GraphicAllocation> c2Graphic;
-            status = mAllocator->newGraphicAllocation(
-                    c2Params.data.params[0],
-                    c2Params.data.params[1],
-                    c2Params.data.params[2],
-                    c2Params.data.usage, &c2Graphic);
-            if (status == C2_OK && c2Graphic) {
-                BufferPoolAllocation *ptr = new BufferPoolAllocation(c2Graphic->handle());
-                if (ptr) {
-                    *alloc = std::shared_ptr<BufferPoolAllocation>(
-                            ptr, GraphicAllocationDtor(c2Graphic));
-                    if (*alloc) {
-                        *allocSize = c2Params.data.params[0] * c2Params.data.params[1];
-                        return ResultStatus::OK;
-                    }
-                    delete ptr;
-                }
-                return ResultStatus::NO_MEMORY;
-            }
-            break;
-        }
-        default:
-            break;
-    }
-    return ResultStatus::CRITICAL_ERROR;
-}
-
-bool _C2BufferPoolAllocator::compatible(
-        const std::vector<uint8_t>  &newParams,
-        const std::vector<uint8_t>  &oldParams) {
-    AllocParams newAlloc;
-    AllocParams oldAlloc;
-    memcpy(&newAlloc, newParams.data(), std::min(sizeof(AllocParams), newParams.size()));
-    memcpy(&oldAlloc, oldParams.data(), std::min(sizeof(AllocParams), oldParams.size()));
-
-    // TODO: support not exact matching. e.g) newCapacity < oldCapacity
-    if (newAlloc.data.allocType == oldAlloc.data.allocType &&
-            newAlloc.data.usage.expected == oldAlloc.data.usage.expected) {
-        for (int i = 0; i < kMaxIntParams; ++i) {
-            if (newAlloc.data.params[i] != oldAlloc.data.params[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-    return false;
-}
-
-void _C2BufferPoolAllocator::getLinearParams(
-        uint32_t capacity, C2MemoryUsage usage, std::vector<uint8_t> *params) {
-    AllocParams c2Params(usage, capacity);
-    params->assign(c2Params.array, c2Params.array + sizeof(AllocParams));
-}
-
-void _C2BufferPoolAllocator::getGraphicParams(
-        uint32_t width, uint32_t height, uint32_t format, C2MemoryUsage usage,
-        std::vector<uint8_t> *params) {
-    AllocParams c2Params(usage, width, height, format);
-    params->assign(c2Params.array, c2Params.array + sizeof(AllocParams));
-}
-
-c2_status_t _C2BufferPoolAllocator::priorLinearAllocation(
-        const C2Handle *handle,
-        std::shared_ptr<C2LinearAllocation> *c2Allocation) {
-    return mAllocator->priorLinearAllocation(handle, c2Allocation);
-}
-
-c2_status_t _C2BufferPoolAllocator::priorGraphicAllocation(
-        const C2Handle *handle,
-        std::shared_ptr<C2GraphicAllocation> *c2Allocation) {
-    return mAllocator->priorGraphicAllocation(handle, c2Allocation);
-}
-
-class C2PooledBlockPool::Impl {
-public:
-    Impl(const std::shared_ptr<C2Allocator> &allocator)
-            : mInit(C2_OK),
-              mBufferPoolManager(ClientManager::getInstance()),
-              mAllocator(std::make_shared<_C2BufferPoolAllocator>(allocator)) {
-        if (mAllocator && mBufferPoolManager) {
-            if (mBufferPoolManager->create(
-                    mAllocator, &mConnectionId) == ResultStatus::OK) {
-                return;
-            }
-        }
-        mInit = C2_NO_INIT;
-    }
-
-    ~Impl() {
-        if (mInit == C2_OK) {
-            mBufferPoolManager->close(mConnectionId);
-        }
-    }
-
-    c2_status_t fetchLinearBlock(
-            uint32_t capacity, C2MemoryUsage usage,
-            std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
-        block->reset();
-        if (mInit != C2_OK) {
-            return mInit;
-        }
-        std::vector<uint8_t> params;
-        mAllocator->getLinearParams(capacity, usage, &params);
-        std::shared_ptr<BufferPoolData> bufferPoolData;
-        native_handle_t *cHandle = nullptr;
-        ResultStatus status = mBufferPoolManager->allocate(
-                mConnectionId, params, &cHandle, &bufferPoolData);
-        if (status == ResultStatus::OK) {
-            std::shared_ptr<C2LinearAllocation> alloc;
-            std::shared_ptr<C2PooledBlockPoolData> poolData =
-                    std::make_shared<C2PooledBlockPoolData>(bufferPoolData);
-            c2_status_t err = mAllocator->priorLinearAllocation(cHandle, &alloc);
-            if (err == C2_OK && poolData && alloc) {
-                *block = _C2BlockFactory::CreateLinearBlock(alloc, poolData, 0, capacity);
-                if (*block) {
-                    return C2_OK;
-                }
-            }
-            return C2_NO_MEMORY;
-        }
-        if (status == ResultStatus::NO_MEMORY) {
-            return C2_NO_MEMORY;
-        }
-        return C2_CORRUPTED;
-    }
-
-    c2_status_t fetchGraphicBlock(
-            uint32_t width, uint32_t height, uint32_t format,
-            C2MemoryUsage usage,
-            std::shared_ptr<C2GraphicBlock> *block) {
-        block->reset();
-        if (mInit != C2_OK) {
-            return mInit;
-        }
-        std::vector<uint8_t> params;
-        mAllocator->getGraphicParams(width, height, format, usage, &params);
-        std::shared_ptr<BufferPoolData> bufferPoolData;
-        native_handle_t *cHandle = nullptr;
-        ResultStatus status = mBufferPoolManager->allocate(
-                mConnectionId, params, &cHandle, &bufferPoolData);
-        if (status == ResultStatus::OK) {
-            std::shared_ptr<C2GraphicAllocation> alloc;
-            std::shared_ptr<C2PooledBlockPoolData> poolData =
-                std::make_shared<C2PooledBlockPoolData>(bufferPoolData);
-            c2_status_t err = mAllocator->priorGraphicAllocation(
-                    cHandle, &alloc);
-            if (err == C2_OK && poolData && alloc) {
-                *block = _C2BlockFactory::CreateGraphicBlock(
-                        alloc, poolData, C2Rect(width, height));
-                if (*block) {
-                    return C2_OK;
-                }
-            }
-            return C2_NO_MEMORY;
-        }
-        if (status == ResultStatus::NO_MEMORY) {
-            return C2_NO_MEMORY;
-        }
-        return C2_CORRUPTED;
-    }
-
-    ConnectionId getConnectionId() {
-        return mInit != C2_OK ? INVALID_CONNECTIONID : mConnectionId;
-    }
-
-private:
-    c2_status_t mInit;
-    const android::sp<ClientManager> mBufferPoolManager;
-    ConnectionId mConnectionId; // locally
-    const std::shared_ptr<_C2BufferPoolAllocator> mAllocator;
-};
-
-C2PooledBlockPool::C2PooledBlockPool(
-        const std::shared_ptr<C2Allocator> &allocator, const local_id_t localId)
-        : mAllocator(allocator), mLocalId(localId), mImpl(new Impl(allocator)) {}
-
-C2PooledBlockPool::~C2PooledBlockPool() {
-}
-
-c2_status_t C2PooledBlockPool::fetchLinearBlock(
-        uint32_t capacity,
-        C2MemoryUsage usage,
-        std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
-    if (mImpl) {
-        return mImpl->fetchLinearBlock(capacity, usage, block);
-    }
-    return C2_CORRUPTED;
-}
-
-c2_status_t C2PooledBlockPool::fetchGraphicBlock(
-        uint32_t width,
-        uint32_t height,
-        uint32_t format,
-        C2MemoryUsage usage,
-        std::shared_ptr<C2GraphicBlock> *block) {
-    if (mImpl) {
-        return mImpl->fetchGraphicBlock(width, height, format, usage, block);
-    }
-    return C2_CORRUPTED;
-}
-
-int64_t C2PooledBlockPool::getConnectionId() {
-    if (mImpl) {
-        return mImpl->getConnectionId();
-    }
-    return 0;
-}
 
 /* ========================================== 2D BLOCK ========================================= */
 
@@ -1099,31 +590,14 @@ C2ConstGraphicBlock C2GraphicBlock::share(const C2Rect &crop, C2Fence fence) {
     return ConstGraphicBlockBuddy(mImpl, C2PlanarSection(*mImpl, crop), fence);
 }
 
-/**
- * Basic block pool implementations.
- */
-C2BasicGraphicBlockPool::C2BasicGraphicBlockPool(
-        const std::shared_ptr<C2Allocator> &allocator)
-  : mAllocator(allocator) {}
-
-c2_status_t C2BasicGraphicBlockPool::fetchGraphicBlock(
-        uint32_t width,
-        uint32_t height,
-        uint32_t format,
-        C2MemoryUsage usage,
-        std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
-    block->reset();
-
-    std::shared_ptr<C2GraphicAllocation> alloc;
-    c2_status_t err = mAllocator->newGraphicAllocation(width, height, format, usage, &alloc);
-    if (err != C2_OK) {
-        return err;
-    }
-
-    *block = _C2BlockFactory::CreateGraphicBlock(alloc);
-
-    return C2_OK;
+std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
+        const std::shared_ptr<C2LinearAllocation> &alloc,
+        const std::shared_ptr<_C2BlockPoolData> &data, size_t offset, size_t size) {
+    std::shared_ptr<C2Block1D::Impl> impl =
+        std::make_shared<C2Block1D::Impl>(alloc, data, offset, size);
+    return std::shared_ptr<C2LinearBlock>(new C2LinearBlock(impl, *impl));
 }
+
 
 std::shared_ptr<C2GraphicBlock> _C2BlockFactory::CreateGraphicBlock(
         const std::shared_ptr<C2GraphicAllocation> &alloc,
@@ -1132,35 +606,6 @@ std::shared_ptr<C2GraphicBlock> _C2BlockFactory::CreateGraphicBlock(
         std::make_shared<C2Block2D::Impl>(alloc, data, allottedCrop);
     return std::shared_ptr<C2GraphicBlock>(new C2GraphicBlock(impl, *impl));
 }
-
-std::shared_ptr<_C2BlockPoolData> _C2BlockFactory::GetGraphicBlockPoolData(
-        const C2Block2D &block) {
-    if (block.mImpl) {
-        return block.mImpl->poolData();
-    }
-    return nullptr;
-}
-
-std::shared_ptr<C2GraphicBlock> _C2BlockFactory::CreateGraphicBlock(
-        const C2Handle *cHandle,
-        const std::shared_ptr<BufferPoolData> &data) {
-    // TODO: get proper allocator? and mutex?
-    static std::unique_ptr<C2AllocatorGralloc> sAllocator = std::make_unique<C2AllocatorGralloc>(0);
-
-    std::shared_ptr<C2GraphicAllocation> alloc;
-    if (C2AllocatorGralloc::isValid(cHandle)) {
-        c2_status_t err = sAllocator->priorGraphicAllocation(cHandle, &alloc);
-        const std::shared_ptr<C2PooledBlockPoolData> poolData =
-                std::make_shared<C2PooledBlockPoolData>(data);
-        if (err == C2_OK && poolData) {
-            // TODO: config setup?
-            std::shared_ptr<C2GraphicBlock> block =
-                    _C2BlockFactory::CreateGraphicBlock(alloc, poolData);
-            return block;
-        }
-    }
-    return nullptr;
-};
 
 
 /* ========================================== BUFFER ========================================= */
@@ -1330,4 +775,5 @@ std::shared_ptr<C2Buffer> C2Buffer::CreateLinearBuffer(const C2ConstLinearBlock 
 std::shared_ptr<C2Buffer> C2Buffer::CreateGraphicBuffer(const C2ConstGraphicBlock &block) {
     return std::shared_ptr<C2Buffer>(new C2Buffer({ block }));
 }
+
 

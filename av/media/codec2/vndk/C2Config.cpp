@@ -16,7 +16,6 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2Config"
-#include <utils/Log.h>
 
 /**
  * Define and initialize global config field descriptors in this cpp file

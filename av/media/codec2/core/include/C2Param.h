@@ -27,6 +27,8 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <memory>
+#include <cstring>
 
 /// \addtogroup Parameters
 /// @{

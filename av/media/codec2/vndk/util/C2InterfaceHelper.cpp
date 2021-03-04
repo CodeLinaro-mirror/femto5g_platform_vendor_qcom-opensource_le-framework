@@ -18,9 +18,7 @@
 #include <C2ParamInternal.h>
 #include <util/C2InterfaceHelper.h>
 
-#include <android-base/stringprintf.h>
-
-using ::android::base::StringPrintf;
+#include <util/C2Debug-log.h>
 
 /* --------------------------------- ReflectorHelper --------------------------------- */
 
