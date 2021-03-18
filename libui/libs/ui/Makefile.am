@@ -1,4 +1,4 @@
-common_sources := Fence.cpp
+common_sources  = Fence.cpp
 common_sources += FramebufferNativeWindow.cpp
 common_sources += FrameStats.cpp
 common_sources += GraphicBuffer.cpp
@@ -9,16 +9,17 @@ common_sources += Rect.cpp
 common_sources += Region.cpp
 common_sources += UiConfig.cpp
 
-lib_LTLIBRARIES = libui.la
-libui_la_SOURCES = $(common_sources)
-libui_la_CPPFLAGS := -I$(top_srcdir)/include -I$(top_srcdir)/opengl/include
+lib_LTLIBRARIES    = libui.la
+libui_la_SOURCES   = $(common_sources)
+libui_la_CPPFLAGS  = -I$(top_srcdir)/include -I$(top_srcdir)/opengl/include
+libui_la_CPPFLAGS += -I$(top_srcdir)/../../system/core/include
 libui_la_CPPFLAGS += -std=c++11  -DANDROID
 libui_la_CPPFLAGS += -DDEBUG_REFS_CALLSTACK_ENABLED=0
-libui_la_LDFLAGS := -llog -lcutils -lsync -lhardware -lutils
+libui_la_LDFLAGS   = -llog -lcutils -lsync -lhardware -lutils
 
 # Export headers
-ui_includedir=$(includedir)/ui
-ui_include_HEADERS := $(top_srcdir)/include/ui/ANativeObjectBase.h
+ui_includedir       = $(includedir)/ui
+ui_include_HEADERS  = $(top_srcdir)/include/ui/ANativeObjectBase.h
 ui_include_HEADERS += $(top_srcdir)/include/ui/Fence.h
 ui_include_HEADERS += $(top_srcdir)/include/ui/GraphicBufferAllocator.h
 ui_include_HEADERS += $(top_srcdir)/include/ui/mat4.h
@@ -39,6 +40,6 @@ ui_include_HEADERS += $(top_srcdir)/include/ui/Point.h
 ui_include_HEADERS += $(top_srcdir)/include/ui/TMatHelpers.h
 ui_include_HEADERS += $(top_srcdir)/include/ui/vec2.h
 
-pkgconfigdir = $(libdir)/pkgconfig
+pkgconfigdir   = $(libdir)/pkgconfig
 pkgconfig_DATA = libui.pc
-EXTRA_DIST = $(pkgconfig_DATA)
+EXTRA_DIST     = $(pkgconfig_DATA)

@@ -6,6 +6,7 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
 # Check for programs
+AM_PROG_AR
 LT_INIT
 AC_PROG_LIBTOOL
 AC_PROG_CXX
@@ -25,19 +26,8 @@ AS_CASE([$host],
 
 ARM=yes
 
-AC_ARG_WITH([core_includes],
-      AC_HELP_STRING([--with-core-includes=@<:@dir@:>@],
-         [Specify the location of the core headers]),
-      [core_incdir=$withval],
-      with_core_includes=no)
-
-if test "x$with_core_includes" != "xno"; then
-     CPPFLAGS="${CPPFLAGS} -I${core_incdir}"
-     AC_SUBST(core_incdir,${core_incdir})
-fi
-
 AC_ARG_WITH([glib],
-      AC_HELP_STRING([--with-glib],
+      AS_HELP_STRING([--with-glib],
          [enable glib, building HLOS systems which use glib]))
 
 if (test "x${with_glib}" = "xyes"); then
