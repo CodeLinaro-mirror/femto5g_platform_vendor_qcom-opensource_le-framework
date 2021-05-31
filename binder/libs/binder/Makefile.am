@@ -1,4 +1,4 @@
-common_sources := AppOpsManager.cpp
+common_sources  = AppOpsManager.cpp
 common_sources += Binder.cpp
 common_sources += BpBinder.cpp
 common_sources += BufferedTextOutput.cpp
@@ -22,28 +22,28 @@ common_sources += ProcessState.cpp
 common_sources += Static.cpp
 common_sources += TextOutput.cpp
 
-lib_LTLIBRARIES = libbinder.la
-libbinder_la_SOURCES = $(common_sources)
-libbinder_la_CPPFLAGS := -I$(top_srcdir)/include
+lib_LTLIBRARIES        = libbinder.la
+libbinder_la_SOURCES   = $(common_sources)
+libbinder_la_CPPFLAGS  = -I$(top_srcdir)/include
 libbinder_la_CPPFLAGS += -std=c++11 -DHAVE_PTHREADS -DHAVE_ANDROID_OS
 if IPC_32BIT
 libbinder_la_CPPFLAGS += -DBINDER_IPC_32BIT=1
 endif
 libbinder_la_CPPFLAGS += -DUSE_GLIB -D__linux__
 libbinder_la_CPPFLAGS += -DDEBUG_REFS_CALLSTACK_ENABLED=0
-libbinder_la_LDFLAGS := -llog -lcutils -lpthread -lutils
+libbinder_la_LDFLAGS   = -llog -lcutils -lpthread -lutils
 
 # Build binder testapp
-bin_PROGRAMS := test_binder
+bin_PROGRAMS = test_binder
 
-test_binder_SOURCES  := tests/test_binder.cpp
-test_binder_CPPFLAGS := $(libbinder_la_CPPFLAGS)
-test_binder_LDADD    := libbinder.la
-test_binder_LDFLAGS  := -lutils -lcutils -llog -lpthread
+test_binder_SOURCES  = tests/test_binder.cpp
+test_binder_CPPFLAGS = $(libbinder_la_CPPFLAGS)
+test_binder_LDADD    = libbinder.la
+test_binder_LDFLAGS  = -lutils -lcutils -llog -lpthread
 
 # Export headers
-binder_includedir=$(includedir)/binder
-binder_include_HEADERS := $(top_srcdir)/include/binder/AppOpsManager.h
+binder_includedir       = $(includedir)/binder
+binder_include_HEADERS  = $(top_srcdir)/include/binder/AppOpsManager.h
 binder_include_HEADERS += $(top_srcdir)/include/binder/Binder.h
 binder_include_HEADERS += $(top_srcdir)/include/binder/BinderService.h
 binder_include_HEADERS += $(top_srcdir)/include/binder/BpBinder.h
@@ -68,6 +68,6 @@ binder_include_HEADERS += $(top_srcdir)/include/binder/ProcessInfoService.h
 binder_include_HEADERS += $(top_srcdir)/include/binder/ProcessState.h
 binder_include_HEADERS += $(top_srcdir)/include/binder/TextOutput.h
 
-pkgconfigdir = $(libdir)/pkgconfig
+pkgconfigdir   = $(libdir)/pkgconfig
 pkgconfig_DATA = libbinder.pc
-EXTRA_DIST = $(pkgconfig_DATA)
+EXTRA_DIST     = $(pkgconfig_DATA)
