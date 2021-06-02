@@ -12,7 +12,6 @@ common_sources += UiConfig.cpp
 lib_LTLIBRARIES    = libui.la
 libui_la_SOURCES   = $(common_sources)
 libui_la_CPPFLAGS  = -I$(top_srcdir)/include -I$(top_srcdir)/opengl/include
-libui_la_CPPFLAGS += -I$(top_srcdir)/../../system/core/include
 libui_la_CPPFLAGS += -std=c++11  -DANDROID
 libui_la_CPPFLAGS += -DDEBUG_REFS_CALLSTACK_ENABLED=0
 libui_la_LDFLAGS   = -llog -lcutils -lsync -lhardware -lutils
