@@ -25,6 +25,7 @@ AC_SUBST([CPPFLAGS])
 AC_SUBST([LIBS])
 
 AC_CONFIG_FILES([ \
-        Makefile
+        Makefile  \
+        libcamera_metadata.pc \
         ])
 AC_OUTPUT

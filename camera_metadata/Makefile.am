@@ -16,3 +16,7 @@ camera_metadata_include_HEADERS += include/system/camera_vendor_tags.h
 
 camera_metadata_private_includedir      = $(includedir)/camera
 camera_metadata_private_include_HEADERS = include/private/camera/camera_metadata_hidden.h
+
+pkgconfigdir   = $(libdir)/pkgconfig
+pkgconfig_DATA = libcamera_metadata.pc
+EXTRA_DIST     = $(pkgconfig_DATA)
