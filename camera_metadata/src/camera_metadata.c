@@ -31,6 +31,8 @@
 #define NOT_FOUND       (-ENOENT)
 #define SN_EVENT_LOG_ID 0x534e4554
 
+#define VALIDATE_CAMERA_METADATA 0
+
 #define ALIGN_TO(val, alignment) \
     (((uintptr_t)(val) + ((alignment) - 1)) & ~((alignment) - 1))
 
@@ -352,7 +354,7 @@ size_t calculate_camera_metadata_entry_data_size(uint8_t type,
 
 int validate_camera_metadata_structure(const camera_metadata_t *metadata,
                                        const size_t *expected_size) {
-
+#if VALIDATE_CAMERA_METADATA
     if (metadata == NULL) {
         ALOGE("%s: metadata is null!", __FUNCTION__);
         return CAMERA_METADATA_VALIDATION_ERROR;
@@ -525,6 +527,9 @@ int validate_camera_metadata_structure(const camera_metadata_t *metadata,
         return OK;
     }
     return CAMERA_METADATA_VALIDATION_SHIFTED;
+#else
+    return OK;
+#endif
 }
 
 int append_camera_metadata(camera_metadata_t *dst,
