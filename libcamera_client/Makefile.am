@@ -1,21 +1,25 @@
+ACLOCAL_AMFLAGS = -I m4
+
 # Build libcamera_client.so
 lib_LTLIBRARIES = libcamera_client.la
 
 # Only enable Metadata for now.
-libcamera_client_la_SOURCES := CameraMetadata.cpp
-libcamera_client_la_SOURCES += CameraParameters.cpp
-libcamera_client_la_SOURCES += VendorTagDescriptor.cpp
+libcamera_client_la_SOURCES    = CameraMetadata.cpp
+libcamera_client_la_SOURCES   += CameraParameters.cpp
+libcamera_client_la_SOURCES   += VendorTagDescriptor.cpp
 
-libcamera_client_la_CPPFLAGS := -I$(top_srcdir)/include
-libcamera_client_la_CPPFLAGS += -std=c++11
-libcamera_client_la_LDFLAGS  := -lutils -lcamera_metadata
+libcamera_client_la_CPPFLAGS   = -I$(top_srcdir)/include
+libcamera_client_la_CPPFLAGS  += @LIBCAMERA_METADATA_CFLAGS@
+libcamera_client_la_CPPFLAGS  += -std=c++11
+
+libcamera_client_la_LDFLAGS    = -lutils @LIBCAMERA_METADATA_LIBS@
 
 # Export headers
-camera_client_includedir=$(includedir)/camera
-camera_client_include_HEADERS := include/camera/CameraMetadata.h
+camera_client_includedir       = $(includedir)/camera
+camera_client_include_HEADERS  = include/camera/CameraMetadata.h
 camera_client_include_HEADERS += include/camera/CameraParameters.h
 camera_client_include_HEADERS += include/camera/VendorTagDescriptor.h
 
-pkgconfigdir = $(libdir)/pkgconfig
+pkgconfigdir   = $(libdir)/pkgconfig
 pkgconfig_DATA = libcamera_client.pc
-EXTRA_DIST = $(pkgconfig_DATA)
+EXTRA_DIST     = $(pkgconfig_DATA)
