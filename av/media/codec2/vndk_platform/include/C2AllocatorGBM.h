@@ -35,20 +35,43 @@
 
 namespace android {
 
-struct C2HandleGBM;
+class C2HandleGBM;
+typedef struct GbmBuf {
+    int buffer_fd; // shared ion buffer
+    int meta_buffer_fd;
+} GbmBuf;
 
-struct C2HandleGBM : public C2Handle {
-   uint32_t mWidth;
-   uint32_t mHeight;
-   uint32_t mFormat;
-   uint32_t mStride;
-   uint32_t mSliceHeight;
-   uint32_t mSize;
-   uint64_t mUsage;
-   struct gbm_bo *bo;
-   int mFd;
-   int mMeta_Fd;
-   uint32_t mId;
+typedef struct ExtraData {
+    uint32_t width;
+    uint32_t height;
+    uint32_t format;
+    uint32_t usage_lo;
+    uint32_t usage_hi;
+    uint32_t stride;
+    uint32_t slice_height;
+    uint32_t size;
+    uint32_t magic;
+    uint32_t id;
+} ExtraData;
+
+class C2HandleGBM : public C2Handle {
+
+public:
+    static bool isValid(const C2Handle * const o);
+    static const C2HandleGBM* Import(const C2Handle *const handle,
+            uint32_t *width, uint32_t *height, uint32_t *format,
+            uint64_t *usage, uint32_t *stride, uint32_t *size);
+    static const ExtraData* getExtraData(const C2Handle *const handle);
+
+    GbmBuf mFds;
+    ExtraData mInts;
+
+    enum {
+        NUM_FDS = sizeof(mFds) / sizeof(int),
+        NUM_INTS = sizeof(mInts) / sizeof(uint32_t),
+        VERSION = sizeof(C2Handle)
+    };
+
 };
 
 class C2AllocatorGBM : public C2Allocator {
@@ -102,10 +125,6 @@ public:
 
     virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
 
-    uint8_t *gbm_map(int fd, int len);
-
-    c2_status_t gbm_unmap(int fd, void *bufaddr, int len);
-
     bool Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, int flag);
 
     C2AllocationGBM(struct gbm_device *gbm, uint32_t width, uint32_t height,
@@ -114,14 +133,17 @@ public:
     c2_status_t status() const { return C2_OK; };
 
 private:
-    int mFd;
-    bool mInitialized;
-    C2HandleGBM mHandle;
+    C2HandleGBM *mHandle;
     void *mBase;
     size_t mMapSize;
+    struct gbm_bo *mBo;
     C2Allocator::id_t mAllocatorId;
 };
 
 } // namespace android
+
+void _UnwrapNativeCodec2GBMMetadata(
+        const C2Handle *const handle, uint32_t *width, uint32_t *height,
+        uint32_t *format,uint64_t *usage, uint32_t *stride, uint32_t *size);
 
 #endif // _CODEC2_ALLOCATOR_GBM_H_
