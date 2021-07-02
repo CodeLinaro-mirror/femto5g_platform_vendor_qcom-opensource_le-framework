@@ -427,7 +427,7 @@ public:
         c2_status_t error() const { return mError; }
 
         /** returns data pointer */
-#ifdef _LINUX_
+#ifdef _AGL_LINUX_
         uint8_t *const *data() const { return mData; }
 #else
         uint8_t *const *data() const { return mOffsetData; }

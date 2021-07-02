@@ -17,7 +17,7 @@
 #include <C2Component.h>
 #include <mutex>
 
-#ifdef _LINUX_
+#ifdef _AGL_LINUX_
 #include <C2AllocatorIon.h>
 #include <C2AllocatorGBM.h>
 #else
@@ -158,7 +158,7 @@ c2_status_t C2PlatformAllocatorStore::fetchAllocator(id_t id, std::shared_ptr<C2
 
     switch (id) {
     case C2AllocatorStore::DEFAULT_LINEAR:
-#ifdef _LINUX_
+#ifdef _AGL_LINUX_
         *allocator = std::make_shared<C2AllocatorIon>(C2PlatformAllocatorStore::DEFAULT_LINEAR);
 #else
         *allocator = std::make_shared<C2AllocatorMmap>(C2PlatformAllocatorStore::MMAP_LINEAR);
@@ -166,7 +166,7 @@ c2_status_t C2PlatformAllocatorStore::fetchAllocator(id_t id, std::shared_ptr<C2
         break;
     case C2AllocatorStore::DEFAULT_GRAPHIC:
     default:
-#ifdef _LINUX_
+#ifdef _AGL_LINUX_
         *allocator = std::make_shared<C2AllocatorGBM>(C2PlatformAllocatorStore::GBM_GRAPHIC);
 #else
         *allocator = std::make_shared<C2AllocatorMmapGraphic>(C2PlatformAllocatorStore::MMAP_GRAPHIC);
