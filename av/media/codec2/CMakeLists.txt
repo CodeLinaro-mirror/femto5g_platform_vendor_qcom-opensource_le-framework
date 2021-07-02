@@ -10,8 +10,11 @@ project(codec2)
 set(CMAKE_CXX_STANDARD 17)
 # TODO add -Werror
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-error=deprecated-declarations -Wno-enum-compare")
+set(AGL_LINUX OFF CACHE BOOL "AGL(Automotive Grade Linux): ON|OFF. Default [OFF]")
 
-add_definitions(-D_LINUX_)
+if(AGL_LINUX)
+add_definitions(-D_AGL_LINUX_)
+endif()
 
 # Build debug version
 # set(CMAKE_BUILD_TYPE Debug)
