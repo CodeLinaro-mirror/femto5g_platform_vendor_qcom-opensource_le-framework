@@ -1,11 +1,12 @@
 AC_PREREQ(2.61)
 AC_INIT([binder], 1.0.0)
-AM_INIT_AUTOMAKE([-Wall gnu foreign])
+AM_INIT_AUTOMAKE([-Wall gnu foreign subdir-objects])
 AC_CONFIG_SRCDIR([Makefile.am])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
 # Check for programs
+AM_PROG_AR
 LT_INIT
 AC_PROG_LIBTOOL
 AC_PROG_CXX
@@ -26,14 +27,14 @@ AS_CASE([$host],
 ARM=yes
 
 AC_ARG_ENABLE(32bit-binder-ipc,
-      AC_HELP_STRING([--enable-32bit-binder-ipc],
+      AS_HELP_STRING([--enable-32bit-binder-ipc],
         [enables IPC on 32bit kernel]),
         [enable_32bit_ipc=${enableval}])
 
 AM_CONDITIONAL(IPC_32BIT, [test "x${enable_32bit_ipc}" = "xyes"])
 
 AC_ARG_WITH([core_includes],
-      AC_HELP_STRING([--with-core-includes=@<:@dir@:>@],
+      AS_HELP_STRING([--with-core-includes=@<:@dir@:>@],
          [Specify the location of the core headers]),
       [core_incdir=$withval],
       with_core_includes=no)
@@ -44,7 +45,7 @@ if test "x$with_core_includes" != "xno"; then
 fi
 
 AC_ARG_WITH([glib],
-      AC_HELP_STRING([--with-glib],
+      AS_HELP_STRING([--with-glib],
          [enable glib, building HLOS systems which use glib]))
 
 if (test "x${with_glib}" = "xyes"); then
@@ -60,6 +61,13 @@ if (test "x${with_glib}" = "xyes"); then
 fi
 
 AM_CONDITIONAL(USE_GLIB, test "x${with_glib}" = "xyes")
+
+AC_ARG_WITH(systemd,
+        AS_HELP_STRING([--with-systemd], [enable binder in systemd]),
+        [SYSTEMD="yes"],
+        [SYSTEMD="no"])
+
+AM_CONDITIONAL([USE_SYSTEMD], [test "x${SYSTEMD}" != "xno"])
 
 AC_SUBST([CFLAGS])
 AC_SUBST([CPPFLAGS])
