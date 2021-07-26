@@ -369,6 +369,8 @@ public:
         Mapped(const std::shared_ptr<_C2Block2DImpl> &impl, bool writable, C2Fence *fence __unused)
             : mImpl(impl), mWritable(writable) {
             memset(mData, 0, sizeof(mData));
+            memset(&mLayout, 0, sizeof(mLayout));
+            memset(mOffsetData, 0, sizeof(mOffsetData));
             const C2Rect crop = mImpl->crop();
             // gralloc requires mapping the whole region of interest as we cannot
             // map multiple regions
@@ -425,7 +427,11 @@ public:
         c2_status_t error() const { return mError; }
 
         /** returns data pointer */
+#ifdef _LINUX_
+        uint8_t *const *data() const { return mData; }
+#else
         uint8_t *const *data() const { return mOffsetData; }
+#endif
 
         /** returns the plane layout */
         C2PlanarLayout layout() const { return mLayout; }
