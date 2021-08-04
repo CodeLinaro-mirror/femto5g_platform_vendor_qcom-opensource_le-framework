@@ -19,6 +19,10 @@
 
 #include "audio-base.h"
 
+#ifndef AUDIO_ARRAY_SIZE
+#define AUDIO_ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
+#endif
+
 /** Define helper values to iterate over enum, extend them or checking value validity.
  *  Those values are compatible with the O corresponding enum values.
  *  They are not macro like similar values in audio.h to avoid conflicting
