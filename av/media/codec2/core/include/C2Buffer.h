@@ -27,7 +27,7 @@
 #ifdef __ANDROID__
 #include <android-C2Buffer.h>
 #else
-#ifdef _LINUX_
+#ifdef _AGL_LINUX_
 #include <linux-C2Buffer.h>
 #else
 typedef void* C2Handle;

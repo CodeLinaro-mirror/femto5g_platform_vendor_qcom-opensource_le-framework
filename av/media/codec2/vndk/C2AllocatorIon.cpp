@@ -563,7 +563,7 @@ c2_status_t C2AllocatorIon::newLinearAllocation(
     }
 
     size_t align = 0;
-#ifdef _LINUX_
+#ifdef _AGL_LINUX_
     c2_status_t ret = C2_OK;
     unsigned flags = 0;
     unsigned heapMask = ION_HEAP(ION_SYSTEM_HEAP_ID);

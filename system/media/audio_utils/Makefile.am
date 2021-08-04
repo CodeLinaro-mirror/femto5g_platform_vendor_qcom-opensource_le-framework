@@ -12,14 +12,24 @@ audioutils_includedir = $(includedir)/audio_utils
 audioutils_include_HEADERS  = include/audio_utils/primitives.h
 audioutils_include_HEADERS += include/audio_utils/format.h
 audioutils_include_HEADERS += include/audio_utils/channels.h
+audioutils_include_HEADERS += include/audio_utils/ErrorLog.h
+audioutils_include_HEADERS += include/audio_utils/Statistics.h
+audioutils_include_HEADERS += include/audio_utils/FdToString.h
+#audioutils_include_HEADERS += include/audio_utils/TimestampVerifier.h
+audioutils_include_HEADERS += include/audio_utils/limiter.h
+audioutils_include_HEADERS += include/audio_utils/clock.h
+audioutils_include_HEADERS += include/audio_utils/clock_nanosleep.h
+audioutils_include_HEADERS += include/audio_utils/Balance.h
 
 audioutils_sources = format.c \
             channels.c \
-            primitives.c
+            primitives.c \
+            ErrorLog.cpp
 
 lib_LTLIBRARIES = libaudioutils.la
 libaudioutils_la_SOURCES = $(audioutils_sources)
 libaudioutils_la_CFLAGS = $(AM_CFLAGS)
+libaudioutils_la_CPPFLAGS = $(AM_CFLAGS)
 libaudioutils_la_LDFLAGS = -shared
 
 ##### tinysndfile #####
