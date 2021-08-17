@@ -106,7 +106,9 @@ bool C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint
         return false;
     }
 
-    bo_fd = gbm_bo_get_fd(bo);
+    //bo_fd = gbm_bo_get_fd(bo);
+    //TODO: use gbm_bo_get_fd
+    bo_fd = bo->ion_fd;
     if (bo_fd < 0) {
         ALOGE("Get bo fd failed");
         gbm_bo_destroy(bo);
