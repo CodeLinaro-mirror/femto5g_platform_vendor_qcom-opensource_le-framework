@@ -21,7 +21,10 @@
 
 #include <utils/Log.h>
 #include <utils/String8.h>
+
+#if DEBUG_REFS_CALLSTACK_ENABLED
 #include <utils/CallStack.h>
+#endif
 
 #include <ui/Rect.h>
 #include <ui/Region.h>

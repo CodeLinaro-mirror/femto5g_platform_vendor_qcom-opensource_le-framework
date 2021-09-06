@@ -30,7 +30,7 @@ AC_PROG_MAKE_SET
 PKG_PROG_PKG_CONFIG
 
 AC_ARG_WITH([glib],
-      AC_HELP_STRING([--with-glib],
+      AS_HELP_STRING([--with-glib],
          [enable glib, building HLOS systems which use glib]))
 
 if (test "x${with_glib}" = "xyes"); then
