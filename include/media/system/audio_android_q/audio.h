@@ -728,6 +728,28 @@ typedef struct record_track_metadata {
  *  Helper functions
  *****************************/
 
+  // see also: std::binary_search
+// search range [left, right)
+static inline bool audio_binary_search_uint_array(const uint32_t audio_array[], size_t left,
+                                                  size_t right, uint32_t target)
+{
+    if (right <= left || target < audio_array[left] || target > audio_array[right - 1]) {
+        return false;
+    }
+
+    while (left < right) {
+        const size_t mid = left + (right - left) / 2;
+        if (audio_array[mid] == target) {
+            return true;
+        } else if (audio_array[mid] < target) {
+            left = mid + 1;
+        } else {
+            right = mid;
+        }
+    }
+    return false;
+}
+
 static inline bool audio_is_output_device(audio_devices_t device)
 {
     if (((device & AUDIO_DEVICE_BIT_IN) == 0) &&
@@ -774,6 +796,18 @@ static inline bool audio_is_a2dp_out_device(audio_devices_t device)
 static inline bool audio_is_a2dp_device(audio_devices_t device)
 {
     return audio_is_a2dp_out_device(device);
+}
+
+static inline bool audio_is_bluetooth_out_sco_device(audio_devices_t device)
+{
+    return audio_binary_search_uint_array(
+            AUDIO_DEVICE_OUT_ALL_SCO_ARRAY, 0 /*left*/, AUDIO_DEVICE_OUT_SCO_CNT, device);
+}
+
+static inline bool audio_is_bluetooth_in_sco_device(audio_devices_t device)
+{
+    return audio_binary_search_uint_array(
+            AUDIO_DEVICE_IN_ALL_SCO_ARRAY, 0 /*left*/, AUDIO_DEVICE_IN_SCO_CNT, device);
 }
 
 static inline bool audio_is_bluetooth_sco_device(audio_devices_t device)
