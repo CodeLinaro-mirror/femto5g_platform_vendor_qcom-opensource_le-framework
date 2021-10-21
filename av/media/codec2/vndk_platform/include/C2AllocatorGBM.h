@@ -57,6 +57,8 @@ typedef struct ExtraData {
     uint32_t size;
     uint32_t magic;
     uint32_t id;
+    uint32_t bo_lo;
+    uint32_t bo_hi;
 } ExtraData;
 
 class C2HandleGBM : public C2Handle {
@@ -65,7 +67,7 @@ public:
     static bool isValid(const C2Handle * const o);
     static const C2HandleGBM* Import(const C2Handle *const handle,
             uint32_t *width, uint32_t *height, uint32_t *format,
-            uint64_t *usage, uint32_t *stride, uint32_t *size);
+            uint64_t *usage, uint32_t *stride, uint32_t *size, uint64_t *bo);
     static const ExtraData* getExtraData(const C2Handle *const handle);
 
     GbmBuf mFds;
@@ -182,6 +184,6 @@ private:
 
 void _UnwrapNativeCodec2GBMMetadata(
         const C2Handle *const handle, uint32_t *width, uint32_t *height,
-        uint32_t *format,uint64_t *usage, uint32_t *stride, uint32_t *size);
+        uint32_t *format,uint64_t *usage, uint32_t *stride, uint32_t *size, uint64_t *bo=NULL);
 
 #endif // _CODEC2_ALLOCATOR_GBM_H_
