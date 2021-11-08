@@ -2,7 +2,7 @@
 
 AC_PREREQ(2.61)
 AC_INIT([camera-metadata], 1.0.0)
-AM_INIT_AUTOMAKE([foreign])
+AM_INIT_AUTOMAKE([foreign subdir-objects])
 AC_CONFIG_SRCDIR([Makefile.am])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -25,6 +25,7 @@ AC_SUBST([CPPFLAGS])
 AC_SUBST([LIBS])
 
 AC_CONFIG_FILES([ \
-        Makefile
+        Makefile  \
+        libcamera_metadata.pc \
         ])
 AC_OUTPUT
