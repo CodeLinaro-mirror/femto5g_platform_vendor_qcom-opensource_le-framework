@@ -109,6 +109,10 @@ c2_status_t GetCodec2BlockPool(
         C2BlockPool::local_id_t id, std::shared_ptr<const C2Component> component,
         std::shared_ptr<C2BlockPool> *pool);
 
+c2_status_t GetCodec2BlockPoolWithAllocator(
+        C2BlockPool::local_id_t id, std::shared_ptr<const C2Component> component,
+        std::shared_ptr<C2BlockPool> *pool, std::shared_ptr<C2Allocator> *c2Allocator);
+
 /**
  * Creates a block pool.
  * \param allocatorId  the allocator ID which is used to allocate blocks
