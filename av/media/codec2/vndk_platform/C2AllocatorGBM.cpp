@@ -36,6 +36,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <chrono>
+#include <inttypes.h>
 using namespace std::chrono_literals;
 
 
@@ -253,19 +254,27 @@ const ExtraData* C2HandleGBM::getExtraData(const C2Handle *const handle) {
 const C2HandleGBM* C2HandleGBM::Import(
         const C2Handle *const handle,
         uint32_t *width, uint32_t *height, uint32_t *format,
-        uint64_t *usage, uint32_t *stride, uint32_t *size)
+        uint64_t *usage, uint32_t *stride, uint32_t *size, uint64_t *bo)
 {
     const ExtraData *xd = getExtraData(handle);
     if (xd == nullptr) {
         return nullptr;
     }
 
-    *width  = xd->width;
-    *height = xd->height;
-    *format = xd->format;
-    *usage  = xd->usage_lo | (uint64_t(xd->usage_hi) << 32);
-    *stride = xd->stride;
-    *size   = xd->size;
+    if (width)
+        *width  = xd->width;
+    if (height)
+        *height = xd->height;
+    if (format)
+        *format = xd->format;
+    if (usage)
+        *usage  = xd->usage_lo | (uint64_t(xd->usage_hi) << 32);
+    if (stride)
+        *stride = xd->stride;
+    if (size)
+        *size = xd->size;
+    if (bo)
+        *bo = xd->bo_lo | (uint64_t(xd->bo_hi) << 32);
 
     return reinterpret_cast<const C2HandleGBM *>(handle);
 }
@@ -363,12 +372,14 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
             mHandle->mInts.size = bo->size;
             //Use fd as the unique buffer id for C2Buffer
             mHandle->mInts.id = bo_fd;
+            mHandle->mInts.bo_lo = (uint32_t)((uint64_t)bo & 0xFFFFFFFF);
+            mHandle->mInts.bo_hi = (uint32_t)(((uint64_t)bo >> 32) & 0xFFFFFFFF);
 
             ALOGV("GBM handle data: fd:%u meta_fd:%u width:%u height:%u format:%u usage_lo:%u "
-                    "usage_hi:%u stride:%u slice_height:%u size:%u",
+                    "usage_hi:%u stride:%u slice_height:%u size:%u, bo:%" PRIu64,
                     mHandle->data[0], mHandle->data[1], mHandle->data[2], mHandle->data[3],
                     mHandle->data[4], mHandle->data[5], mHandle->data[6], mHandle->data[7],
-                    mHandle->data[8], mHandle->data[9]);
+                    mHandle->data[8], mHandle->data[9], (uint64_t(mHandle->data[11]) << 32) | mHandle->data[10]);
 
             ALOGV("created gbm bo:%p fd:%u meta_fd:%u size:%d width:%d height:%d",
                     bo, bo_fd, meta_fd, bo->size, bo->width, bo->height);
@@ -530,13 +541,14 @@ c2_status_t C2AllocatorGBM::priorGraphicAllocation(
     uint64_t flags = 0;
     uint32_t stride = 0;
     uint32_t size = 0;
+    uint64_t bo = 0;
 
     if (mInit != C2_OK) {
         ALOGE("GBM device is not created, unexpected");
         return C2_NO_INIT;
     }
 
-    const C2HandleGBM *gbmHandle = C2HandleGBM::Import(handle, &width, &height, &format, &flags, &stride, &size);
+    const C2HandleGBM *gbmHandle = C2HandleGBM::Import(handle, &width, &height, &format, &flags, &stride, &size, &bo);
 
     if (gbmHandle == nullptr) {
         allocation->reset(new C2AllocationGBM(mGBM, mPool, width, height, format, flags, mTraits->id));
@@ -563,7 +575,8 @@ c2_status_t C2AllocatorGBM::setMaxAllocationCount(uint32_t size) {
 
 void _UnwrapNativeCodec2GBMMetadata(
         const C2Handle *const handle,
-        uint32_t *width, uint32_t *height, uint32_t *format,uint64_t *usage, uint32_t *stride, uint32_t *size) {
-    (void)android::C2HandleGBM::Import(handle, width, height, format, usage, stride, size);
+        uint32_t *width, uint32_t *height, uint32_t *format, uint64_t *usage,
+        uint32_t *stride, uint32_t *size, uint64_t *bo) {
+    (void)android::C2HandleGBM::Import(handle, width, height, format, usage, stride, size, bo);
 }
 
