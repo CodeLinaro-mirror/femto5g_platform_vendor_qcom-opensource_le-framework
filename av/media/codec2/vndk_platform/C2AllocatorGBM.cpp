@@ -313,6 +313,10 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
     uint64_t res_id = ((uint64_t)w << 32) | h;
     c2_status_t ret = C2_OK;
 
+    if (flags & C2MemoryUsage::READ_PROTECTED) {
+        flags |= GBM_BO_USAGE_PROTECTED_QTI;
+    }
+
     ret = mPool->acquireBuffer(mBufEntryInfo, w, h);
 
     if (ret != C2_OK) {
