@@ -19,6 +19,10 @@
 
 #include "audio-base.h"
 
+#ifndef AUDIO_ARRAY_SIZE
+#define AUDIO_ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
+#endif
+
 /** Define helper values to iterate over enum, extend them or checking value validity.
  *  Those values are compatible with the O corresponding enum values.
  *  They are not macro like similar values in audio.h to avoid conflicting
@@ -192,5 +196,28 @@ enum {
 #define MIC_FIELD_DIMENSION_NORMAL (0.0f)
 #define MIC_FIELD_DIMENSION_NARROW (1.0f)
 #define MIC_FIELD_DIMENSION_DEFAULT MIC_FIELD_DIMENSION_NORMAL
+
+
+#ifdef __cplusplus
+#define CONST_ARRAY inline constexpr
+#else
+#define CONST_ARRAY const
+#endif
+
+// inline constexpr
+static CONST_ARRAY uint32_t AUDIO_DEVICE_OUT_ALL_SCO_ARRAY[] = {
+    AUDIO_DEVICE_OUT_BLUETOOTH_SCO,             // 0x00000010u,
+    AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET,     // 0x00000020u,
+    AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT,      // 0x00000040u,
+};
+
+static const uint32_t AUDIO_DEVICE_OUT_SCO_CNT = AUDIO_ARRAY_SIZE(AUDIO_DEVICE_OUT_ALL_SCO_ARRAY);
+
+// inline constexpr
+static CONST_ARRAY uint32_t AUDIO_DEVICE_IN_ALL_SCO_ARRAY[] = {
+    AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET,      // 0x80000008u
+};
+
+static const uint32_t AUDIO_DEVICE_IN_SCO_CNT = AUDIO_ARRAY_SIZE(AUDIO_DEVICE_IN_ALL_SCO_ARRAY);
 
 #endif  // ANDROID_AUDIO_BASE_UTILS_H
