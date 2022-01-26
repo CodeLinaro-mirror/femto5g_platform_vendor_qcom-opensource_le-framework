@@ -87,7 +87,7 @@ static size_t gParcelGlobalAllocSize = 0;
 static size_t gParcelGlobalAllocCount = 0;
 
 // Maximum size of a blob to transfer in-place.
-static const size_t BLOB_INPLACE_LIMIT = 16 * 1024;
+static const size_t BLOB_INPLACE_LIMIT = 100 * 1024;
 
 enum {
     BLOB_INPLACE = 0,
