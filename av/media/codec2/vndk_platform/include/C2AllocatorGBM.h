@@ -32,6 +32,11 @@
 #include <C2Buffer.h>
 #include "gbm.h"
 #include "gbm_priv.h"
+#include <iterator>
+#include <list>
+#include <memory>
+#include <mutex>
+#include <condition_variable>
 
 namespace android {
 
@@ -52,6 +57,8 @@ typedef struct ExtraData {
     uint32_t size;
     uint32_t magic;
     uint32_t id;
+    uint32_t bo_lo;
+    uint32_t bo_hi;
 } ExtraData;
 
 class C2HandleGBM : public C2Handle {
@@ -60,7 +67,7 @@ public:
     static bool isValid(const C2Handle * const o);
     static const C2HandleGBM* Import(const C2Handle *const handle,
             uint32_t *width, uint32_t *height, uint32_t *format,
-            uint64_t *usage, uint32_t *stride, uint32_t *size);
+            uint64_t *usage, uint32_t *stride, uint32_t *size, uint64_t *bo);
     static const ExtraData* getExtraData(const C2Handle *const handle);
 
     GbmBuf mFds;
@@ -72,6 +79,34 @@ public:
         VERSION = sizeof(C2Handle)
     };
 
+};
+
+class BufferEntryInfo {
+public:
+  BufferEntryInfo (bool used, uint64_t res_id, struct gbm_bo *bo, int32_t bo_fd, int32_t meta_fd);
+
+  bool used;
+  uint64_t res_id; // resolution id
+  struct gbm_bo *bo;
+  int32_t bo_fd;
+  int32_t meta_fd;
+};
+
+class BufferPool {
+ public:
+    BufferPool();
+    c2_status_t acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, uint32_t width, uint32_t height);
+    c2_status_t setMaxBufferCount(uint32_t size);
+    c2_status_t releaseBuffer(std::shared_ptr<BufferEntryInfo> entry);
+
+    std::list<std::shared_ptr<BufferEntryInfo> > mBufferList; // may include old and new buffer during port reconfig
+private:
+    uint32_t getBufferCountOfCurRes(); // get buffer count of current resolution
+    uint64_t mCurResId; // current resolution id
+    uint32_t mMaxBufferCount; // means the max buffer count in pool for current sequence
+    uint32_t mExtBufferCount; // extend buffer count for time out
+    std::mutex mLock;   //  mutex for the buffer lists
+    std::condition_variable mEmptyCondition;
 };
 
 class C2AllocatorGBM : public C2Allocator {
@@ -90,6 +125,8 @@ public:
     virtual c2_status_t priorGraphicAllocation(const C2Handle *handle,
             std::shared_ptr<C2GraphicAllocation> *allocation) override;
 
+    c2_status_t setMaxAllocationCount(uint32_t size);
+
     C2AllocatorGBM(id_t id);
 
     virtual c2_status_t status() const { return mInit; }
@@ -105,6 +142,7 @@ private:
     c2_status_t mInit;
     std::shared_ptr<const Traits> mTraits;
     struct gbm_device *mGBM;
+    std::shared_ptr<BufferPool> mPool;
     int mDevice_fd;
 };
 
@@ -125,25 +163,27 @@ public:
 
     virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
 
-    bool Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, int flag);
+    c2_status_t Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, int flag);
 
-    C2AllocationGBM(struct gbm_device *gbm, uint32_t width, uint32_t height,
+    C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferPool> &pool, uint32_t width, uint32_t height,
             uint32_t format, uint64_t usage, C2Allocator::id_t allocatorId);
 
-    c2_status_t status() const { return C2_OK; };
+    c2_status_t status() const { return mRet; };
 
 private:
     C2HandleGBM *mHandle;
+    std::shared_ptr<BufferEntryInfo> mBufEntryInfo;
     void *mBase;
     size_t mMapSize;
-    struct gbm_bo *mBo;
+    std::shared_ptr<BufferPool> mPool;
     C2Allocator::id_t mAllocatorId;
+    c2_status_t mRet;
 };
 
 } // namespace android
 
 void _UnwrapNativeCodec2GBMMetadata(
         const C2Handle *const handle, uint32_t *width, uint32_t *height,
-        uint32_t *format,uint64_t *usage, uint32_t *stride, uint32_t *size);
+        uint32_t *format,uint64_t *usage, uint32_t *stride, uint32_t *size, uint64_t *bo=NULL);
 
 #endif // _CODEC2_ALLOCATOR_GBM_H_

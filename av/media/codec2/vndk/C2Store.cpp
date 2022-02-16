@@ -27,6 +27,9 @@
 
 #include <C2BlockInternal.h>
 
+#include <map>
+#include <mutex>
+
 namespace android {
 
 
@@ -118,6 +121,58 @@ c2_status_t C2PlatformGraphicBlockPool::fetchGraphicBlock(
     return C2_OK;
 }
 
+class C2PooledLinearBlockPool : public C2PlatformLinearBlockPool {
+public:
+    C2PooledLinearBlockPool(const std::shared_ptr<C2Allocator> &allocator, const local_id_t localId);
+
+    virtual ~C2PooledLinearBlockPool() override;
+
+    virtual C2Allocator::id_t getAllocatorId() const override {
+        return mAllocator->getId();
+    }
+
+    virtual local_id_t getLocalId() const override {
+        return mLocalId;
+    }
+
+private:
+    const std::shared_ptr<C2Allocator> mAllocator;
+    const local_id_t mLocalId;
+};
+
+C2PooledLinearBlockPool::C2PooledLinearBlockPool(
+        const std::shared_ptr<C2Allocator> &allocator, const local_id_t localId)
+        : C2PlatformLinearBlockPool(allocator), mAllocator(allocator), mLocalId(localId) {}
+
+C2PooledLinearBlockPool::~C2PooledLinearBlockPool() {
+}
+
+class C2PooledGraphicBlockPool : public C2PlatformGraphicBlockPool {
+public:
+    C2PooledGraphicBlockPool(const std::shared_ptr<C2Allocator> &allocator, const local_id_t localId);
+
+    virtual ~C2PooledGraphicBlockPool() override;
+
+    virtual C2Allocator::id_t getAllocatorId() const override {
+        return mAllocator->getId();
+    }
+
+    virtual local_id_t getLocalId() const override {
+        return mLocalId;
+    }
+
+private:
+    const std::shared_ptr<C2Allocator> mAllocator;
+    const local_id_t mLocalId;
+};
+
+C2PooledGraphicBlockPool::C2PooledGraphicBlockPool(
+        const std::shared_ptr<C2Allocator> &allocator, const local_id_t localId)
+        : C2PlatformGraphicBlockPool(allocator), mAllocator(allocator), mLocalId(localId) {}
+
+C2PooledGraphicBlockPool::~C2PooledGraphicBlockPool() {
+}
+
 /* ===================================================== */
 /* Allocator Store */
 class C2PlatformAllocatorStore : public C2AllocatorStore {
@@ -176,17 +231,160 @@ c2_status_t C2PlatformAllocatorStore::fetchAllocator(id_t id, std::shared_ptr<C2
     return C2_OK;
 }
 
+namespace {
+
+class _C2BlockPoolCache {
+public:
+    _C2BlockPoolCache() : mBlockPoolSeqId(C2BlockPool::PLATFORM_START + 1) {}
+
+    c2_status_t _createBlockPool(
+            C2PlatformAllocatorStore::id_t allocatorId,
+            std::shared_ptr<const C2Component> component,
+            C2BlockPool::local_id_t poolId,
+            std::shared_ptr<C2BlockPool> *pool) {
+        std::shared_ptr<C2PlatformAllocatorStore> allocatorStore(new C2PlatformAllocatorStore);
+        std::shared_ptr<C2Allocator> allocator;
+        c2_status_t res = C2_NOT_FOUND;
+
+        switch(allocatorId) {
+            case C2AllocatorStore::DEFAULT_LINEAR:
+                res = allocatorStore->fetchAllocator(
+                        C2AllocatorStore::DEFAULT_LINEAR, &allocator);
+                if (res == C2_OK) {
+                    std::shared_ptr<C2BlockPool> ptr =
+                        std::make_shared<C2PooledLinearBlockPool>(allocator, poolId);
+                    *pool = ptr;
+                    mBlockPools[poolId] = ptr;
+                    mBlockAllocators[poolId] = allocator;
+                    mComponents[poolId] = component;
+                }
+                break;
+            case C2AllocatorStore::DEFAULT_GRAPHIC:
+                res = allocatorStore->fetchAllocator(
+                        C2AllocatorStore::DEFAULT_GRAPHIC, &allocator);
+                if (res == C2_OK) {
+                    std::shared_ptr<C2BlockPool> ptr =
+                        std::make_shared<C2PooledGraphicBlockPool>(allocator, poolId);
+                    *pool = ptr;
+                    mBlockPools[poolId] = ptr;
+                    mBlockAllocators[poolId] = allocator;
+                    mComponents[poolId] = component;
+                }
+                break;
+            default:
+                break;
+        }
+        return res;
+    }
+
+    c2_status_t createBlockPool(
+            C2PlatformAllocatorStore::id_t allocatorId,
+            std::shared_ptr<const C2Component> component,
+            std::shared_ptr<C2BlockPool> *pool) {
+        return _createBlockPool(allocatorId, component, mBlockPoolSeqId++, pool);
+    }
+
+    bool getBlockPool(
+            C2BlockPool::local_id_t blockPoolId,
+            std::shared_ptr<const C2Component> component,
+            std::shared_ptr<C2BlockPool> *pool) {
+        // TODO: use one iterator for multiple blockpool type scalability.
+        std::shared_ptr<C2BlockPool> ptr;
+        auto it = mBlockPools.find(blockPoolId);
+        if (it != mBlockPools.end()) {
+            ptr = it->second.lock();
+            if (!ptr) {
+                mBlockPools.erase(it);
+                mBlockAllocators.erase(blockPoolId);
+                mComponents.erase(blockPoolId);
+            } else {
+                auto found = mComponents.find(blockPoolId);
+                if (component == found->second.lock()) {
+                    *pool = ptr;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool getBlockPool(
+            C2BlockPool::local_id_t blockPoolId,
+            std::shared_ptr<const C2Component> component,
+            std::shared_ptr<C2BlockPool> *pool,
+            std::shared_ptr<C2Allocator> *allocator) {
+        // TODO: use one iterator for multiple blockpool type scalability.
+        bool ret = false;
+        std::shared_ptr<C2BlockPool> ptr;
+        std::shared_ptr<C2Allocator> alloc;
+        auto it = mBlockPools.find(blockPoolId);
+        if (it != mBlockPools.end()) {
+            ptr = it->second.lock();
+            if (!ptr) {
+                mBlockPools.erase(it);
+                mBlockAllocators.erase(blockPoolId);
+                mComponents.erase(blockPoolId);
+            } else {
+                auto found = mComponents.find(blockPoolId);
+                if (component == found->second.lock()) {
+                    *pool = ptr;
+                    ret = true;
+                }
+            }
+        }
+
+        if (ret == false)
+          return ret;
+
+        auto alloc_it  = mBlockAllocators.find(blockPoolId);
+        if (alloc_it != mBlockAllocators.end()) {
+            alloc = alloc_it->second.lock();
+            if (!alloc) {
+                mBlockAllocators.erase(alloc_it);
+                mBlockPools.erase(blockPoolId);
+                mComponents.erase(blockPoolId);
+            } else {
+                auto found = mComponents.find(blockPoolId);
+                if (component == found->second.lock()) {
+                    *allocator = alloc;
+                    ret = true;
+                }
+            }
+        }
+
+        return ret;
+    }
+
+private:
+    C2BlockPool::local_id_t mBlockPoolSeqId;
+
+    std::map<C2BlockPool::local_id_t, std::weak_ptr<C2BlockPool>> mBlockPools;
+    std::map<C2BlockPool::local_id_t, std::weak_ptr<C2Allocator>> mBlockAllocators;
+    std::map<C2BlockPool::local_id_t, std::weak_ptr<const C2Component>> mComponents;
+};
+
+static std::unique_ptr<_C2BlockPoolCache> sBlockPoolCache =
+    std::make_unique<_C2BlockPoolCache>();
+static std::mutex sBlockPoolCacheMutex;
+
+} // anynymous namespace
+
 /* ===================================================== */
 /* External */
-
-
 c2_status_t GetCodec2BlockPool(
         C2BlockPool::local_id_t id, std::shared_ptr<const C2Component> component,
         std::shared_ptr<C2BlockPool> *pool) {
     pool->reset();
+    std::lock_guard<std::mutex> lock(sBlockPoolCacheMutex);
     std::shared_ptr<C2PlatformAllocatorStore> allocatorStore(new C2PlatformAllocatorStore);
     std::shared_ptr<C2Allocator> allocator;
     c2_status_t res = C2_NOT_FOUND;
+
+    if (id >= C2BlockPool::PLATFORM_START) {
+        if (sBlockPoolCache->getBlockPool(id, component, pool)) {
+            return C2_OK;
+        }
+    }
 
     switch (id) {
     case C2BlockPool::BASIC_LINEAR:
@@ -199,6 +397,53 @@ c2_status_t GetCodec2BlockPool(
         res = allocatorStore->fetchAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &allocator);
         if (res == C2_OK) {
             *pool = std::make_shared<C2PlatformGraphicBlockPool>(allocator);
+        }
+        break;
+    default:
+        break;
+    }
+    return res;
+}
+
+c2_status_t CreateCodec2BlockPool(
+        C2PlatformAllocatorStore::id_t allocatorId,
+        std::shared_ptr<const C2Component> component,
+        std::shared_ptr<C2BlockPool> *pool) {
+    pool->reset();
+
+    std::lock_guard<std::mutex> lock(sBlockPoolCacheMutex);
+    return sBlockPoolCache->createBlockPool(allocatorId, component, pool);
+}
+
+c2_status_t GetCodec2BlockPoolWithAllocator(
+        C2BlockPool::local_id_t id, std::shared_ptr<const C2Component> component,
+        std::shared_ptr<C2BlockPool> *pool, std::shared_ptr<C2Allocator> *c2Allocator) {
+    pool->reset();
+    std::lock_guard<std::mutex> lock(sBlockPoolCacheMutex);
+    std::shared_ptr<C2PlatformAllocatorStore> allocatorStore(new C2PlatformAllocatorStore);
+    std::shared_ptr<C2Allocator> allocator;
+    c2_status_t res = C2_NOT_FOUND;
+
+    if (id >= C2BlockPool::PLATFORM_START) {
+        if (sBlockPoolCache->getBlockPool(id, component, pool, &allocator)) {
+            *c2Allocator = allocator;
+            return C2_OK;
+        }
+    }
+
+    switch (id) {
+    case C2BlockPool::BASIC_LINEAR:
+        res = allocatorStore->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &allocator);
+        if (res == C2_OK) {
+            *pool = std::make_shared<C2PlatformLinearBlockPool>(allocator);
+            *c2Allocator = allocator;
+        }
+        break;
+    case C2BlockPool::BASIC_GRAPHIC:
+        res = allocatorStore->fetchAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &allocator);
+        if (res == C2_OK) {
+            *pool = std::make_shared<C2PlatformGraphicBlockPool>(allocator);
+            *c2Allocator = allocator;
         }
         break;
     default:

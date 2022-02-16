@@ -23,6 +23,7 @@
 
 #include <memory>
 #include <vector>
+#include <limits>
 
 #ifdef __ANDROID__
 #include <android-C2Buffer.h>

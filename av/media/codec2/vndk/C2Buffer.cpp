@@ -601,7 +601,11 @@ std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
         const std::shared_ptr<_C2BlockPoolData> &data, size_t offset, size_t size) {
     std::shared_ptr<C2Block1D::Impl> impl =
         std::make_shared<C2Block1D::Impl>(alloc, data, offset, size);
-    return std::shared_ptr<C2LinearBlock>(new C2LinearBlock(impl, *impl));
+    if (impl != nullptr) {
+        return std::shared_ptr<C2LinearBlock>(new C2LinearBlock(impl, *impl));
+    } else {
+        return nullptr;
+    }
 }
 
 
@@ -610,7 +614,11 @@ std::shared_ptr<C2GraphicBlock> _C2BlockFactory::CreateGraphicBlock(
         const std::shared_ptr<_C2BlockPoolData> &data, const C2Rect &allottedCrop) {
     std::shared_ptr<C2Block2D::Impl> impl =
         std::make_shared<C2Block2D::Impl>(alloc, data, allottedCrop);
-    return std::shared_ptr<C2GraphicBlock>(new C2GraphicBlock(impl, *impl));
+    if (impl != nullptr) {
+        return std::shared_ptr<C2GraphicBlock>(new C2GraphicBlock(impl, *impl));
+    } else {
+        return nullptr;
+    }
 }
 
 
