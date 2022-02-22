@@ -522,7 +522,11 @@ c2_status_t C2AllocatorGBM::newGraphicAllocation( uint32_t width, uint32_t heigh
 
     std::shared_ptr<C2AllocationGBM> alloc = std::make_shared<C2AllocationGBM>
         (mGBM, mPool, width, height, format, usage.expected, mTraits->id);
-    ret = alloc->status();
+    if (alloc != nullptr) {
+      ret = alloc->status();
+    } else {
+      ret = C2_NO_MEMORY;
+    }
 
     if (ret == C2_OK) {
         *allocation = alloc;
