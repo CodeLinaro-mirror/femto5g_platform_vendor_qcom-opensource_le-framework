@@ -568,6 +568,10 @@ c2_status_t C2AllocatorIon::newLinearAllocation(
     c2_status_t ret = C2_OK;
     unsigned flags = 0;
     unsigned heapMask = ION_HEAP(ION_SYSTEM_HEAP_ID);
+    if (usage.expected & C2MemoryUsage::READ_PROTECTED) {
+        flags = ION_FLAG_SECURE | ION_FLAG_CP_BITSTREAM;
+        heapMask = ION_HEAP(ION_SECURE_HEAP_ID) | ION_HEAP(ION_SECURE_DISPLAY_HEAP_ID);
+    }
 #else
     unsigned heapMask = ~0;
     unsigned flags = 0;

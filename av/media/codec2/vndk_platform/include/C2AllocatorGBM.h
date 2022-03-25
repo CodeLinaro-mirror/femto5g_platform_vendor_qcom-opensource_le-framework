@@ -26,6 +26,42 @@
  IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ Changes from Qualcomm Innovation Center are provided under the following license:
+
+ Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted (subject to the limitations in the
+ disclaimer below) provided that the following conditions are met:
+
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+
+     * Redistributions in binary form must reproduce the above
+       copyright notice, this list of conditions and the following
+       disclaimer in the documentation and/or other materials provided
+       with the distribution.
+
+     * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+       contributors may be used to endorse or promote products derived
+       from this software without specific prior written permission.
+
+ NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 #ifndef _CODEC2_ALLOCATOR_GBM_H_
 #define _CODEC2_ALLOCATOR_GBM_H_
 
@@ -83,10 +119,10 @@ public:
 
 class BufferEntryInfo {
 public:
-  BufferEntryInfo (bool used, uint64_t res_id, struct gbm_bo *bo, int32_t bo_fd, int32_t meta_fd);
+  BufferEntryInfo (bool used, uint64_t res_fmt_id, struct gbm_bo *bo, int32_t bo_fd, int32_t meta_fd);
 
   bool used;
-  uint64_t res_id; // resolution id
+  uint64_t res_fmt_id; // id contains resolution and pixel format
   struct gbm_bo *bo;
   int32_t bo_fd;
   int32_t meta_fd;
@@ -95,14 +131,14 @@ public:
 class BufferPool {
  public:
     BufferPool();
-    c2_status_t acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, uint32_t width, uint32_t height);
+    c2_status_t acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, uint32_t width, uint32_t height, uint32_t format);
     c2_status_t setMaxBufferCount(uint32_t size);
     c2_status_t releaseBuffer(std::shared_ptr<BufferEntryInfo> entry);
 
     std::list<std::shared_ptr<BufferEntryInfo> > mBufferList; // may include old and new buffer during port reconfig
 private:
-    uint32_t getBufferCountOfCurRes(); // get buffer count of current resolution
-    uint64_t mCurResId; // current resolution id
+    uint32_t getBufferCountOfCurResFmt(); // get buffer count of current resolution and pixel format
+    uint64_t mCurResFmtId; // current id contain resolution and pixel format
     uint32_t mMaxBufferCount; // means the max buffer count in pool for current sequence
     uint32_t mExtBufferCount; // extend buffer count for time out
     std::mutex mLock;   //  mutex for the buffer lists
