@@ -20,7 +20,9 @@
 #include <memory> // for std::shared_ptr, weak_ptr and unique_ptr
 #include <type_traits> // for std::aligned_union
 
+#ifndef _AGL_LINUX_
 #include <utils/StrongPointer.h> // for android::sp and wp
+#endif
 
 #include <media/stagefright/foundation/TypeTraits.h>
 #include <media/stagefright/foundation/Flagged.h>
@@ -247,6 +249,7 @@ struct HIDE _AData_copier {
     /**
      * Downcast specializations for sp<>, shared_ptr<> and weak_ptr<>
      */
+#ifndef _AGL_LINUX_
     template<typename Tp, typename U, typename=enable_if_T_is_same_as<sp<Tp>>>
     inline static void assign(sp<Tp> *data, const sp<U> &src) {
         *data = static_cast<Tp*>(src.get());
@@ -263,7 +266,7 @@ struct HIDE _AData_copier {
         sp<U> __tmp = std::move(src); // move src out as get cannot
         *data = static_cast<Tp*>(__tmp.get());
     }
-
+#endif
     template<typename Tp, typename U, typename=enable_if_T_is_same_as<std::shared_ptr<Tp>>>
     inline static void assign(std::shared_ptr<Tp> *data, const std::shared_ptr<U> &src) {
         *data = std::static_pointer_cast<Tp>(src);
@@ -344,12 +347,13 @@ struct HIDE _AData_mover {
     /**
      * Downcast specializations for sp<>, shared_ptr<> and weak_ptr<>
      */
+#ifndef _AGL_LINUX_
     template<typename Tp, typename U, typename=enable_if_T_is_same_as<sp<Tp>>>
     inline static void assign(sp<Tp> *data, sp<U> &&src) {
         sp<U> __tmp = std::move(src); // move src out as get cannot
         *data = static_cast<Tp*>(__tmp.get());
     }
-
+#endif
     template<typename Tp, typename U, typename=enable_if_T_is_same_as<std::shared_ptr<Tp>>>
     inline static void assign(std::shared_ptr<Tp> *data, std::shared_ptr<U> &&src) {
         std::shared_ptr<U> __tmp = std::move(src); // move src out as static_pointer_cast cannot
@@ -714,11 +718,12 @@ public:
         static constexpr Flag flagFor(std::unique_ptr<T>*p) { return relaxedFlagFor(p, (T*)0); }
         template<typename T>
         static constexpr Flag flagFor(std::weak_ptr<T>*p) { return relaxedFlagFor(p, (T*)0); }
+#ifndef _AGL_LINUX_
         template<typename T>
         static constexpr Flag flagFor(sp<T>*p) { return relaxedFlagFor(p, (T*)0); }
         template<typename T>
         static constexpr Flag flagFor(wp<T>*p) { return relaxedFlagFor(p, (T*)0); }
-
+#endif
         /**
          * Type support template that provodes the stored type for T.
          * This is itself if it is one of Ts, or the first type in Ts that T is convertible to.
