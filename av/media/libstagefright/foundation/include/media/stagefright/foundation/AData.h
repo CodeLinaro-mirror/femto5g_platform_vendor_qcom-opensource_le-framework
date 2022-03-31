@@ -22,6 +22,8 @@
 
 #ifndef _AGL_LINUX_
 #include <utils/StrongPointer.h> // for android::sp and wp
+#else
+#include <limits>
 #endif
 
 #include <media/stagefright/foundation/TypeTraits.h>
