@@ -26,6 +26,42 @@
  IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ Changes from Qualcomm Innovation Center are provided under the following license:
+
+ Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted (subject to the limitations in the
+ disclaimer below) provided that the following conditions are met:
+
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+
+     * Redistributions in binary form must reproduce the above
+       copyright notice, this list of conditions and the following
+       disclaimer in the documentation and/or other materials provided
+       with the distribution.
+
+     * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+       contributors may be used to endorse or promote products derived
+       from this software without specific prior written permission.
+
+ NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 #define LOG_NDEBUG 0
 #define LOG_TAG "C2AllocatorGBM"
 #include <C2AllocatorGBM.h>
@@ -62,20 +98,21 @@ using namespace std::chrono_literals;
 
 namespace android {
 
-#define _print_buf_entry(str, buf_entry, pool)                                \
-{                                                                             \
-    if (buf_entry != nullptr) {                                               \
-        ALOGV("%s entry:%p used:%d fd:%u meta_fd:%u wxh:%ux%u pool:%p\n",     \
-            str, (buf_entry).get(), (buf_entry)->used, (buf_entry)->bo_fd,    \
-            (buf_entry)->meta_fd, (uint32_t)((buf_entry)->res_id >> 32),      \
-            (uint32_t)(((buf_entry)->res_id) & 0xFFFFFFFF),                   \
-            (pool));                                                          \
-   }                                                                          \
+#define _print_buf_entry(str, buf_entry, pool)                                        \
+{                                                                                     \
+    if (buf_entry != nullptr) {                                                       \
+        ALOGV("%s entry:%p used:%d fd:%u meta_fd:%u format:0x%x wxh:%ux%u pool:%p\n", \
+            str, (buf_entry).get(), (buf_entry)->used, (buf_entry)->bo_fd,            \
+            (buf_entry)->meta_fd, (uint32_t)((buf_entry)->res_fmt_id >> 32),          \
+            (uint32_t)(((buf_entry)->res_fmt_id >> 16) & 0xFFFF),                     \
+            (uint32_t)((buf_entry)->res_fmt_id & 0xFFFF),                             \
+            (pool));                                                                  \
+   }                                                                                  \
 }
 
-BufferEntryInfo::BufferEntryInfo(bool used, uint64_t res_id,
+BufferEntryInfo::BufferEntryInfo(bool used, uint64_t res_fmt_id,
       struct gbm_bo * bo, int32_t bo_fd, int32_t meta_fd)
-    : used(used), res_id(res_id), bo(bo), bo_fd(bo_fd), meta_fd(meta_fd)
+    : used(used), res_fmt_id(res_fmt_id), bo(bo), bo_fd(bo_fd), meta_fd(meta_fd)
 {
 }
 
@@ -90,18 +127,19 @@ c2_status_t BufferPool::setMaxBufferCount(uint32_t size)
     std::lock_guard<std::mutex> listLock(mLock);
     mMaxBufferCount = size > DEFAULT_POOL_SIZE ? size : DEFAULT_POOL_SIZE;
     mExtBufferCount = 0;
-    ALOGV("set max bufferCount: want:%d, result:%d, and reset extend buffer count", size, mMaxBufferCount);
+    ALOGV("set max bufferCount of pool:%p: want:%d, result:%d, and reset extend buffer count",
+        this, size, mMaxBufferCount);
 
     return C2_OK;
 }
 
-uint32_t BufferPool::getBufferCountOfCurRes()
+uint32_t BufferPool::getBufferCountOfCurResFmt()
 {
     // caller need ensure lock before calling
     uint32_t bufferCount = 0;
     auto itr = mBufferList.begin();
     while (itr != mBufferList.end()) {
-        if ((*itr)->res_id == mCurResId) {
+        if ((*itr)->res_fmt_id == mCurResFmtId) {
             bufferCount++;
         }
         ++itr;
@@ -110,18 +148,18 @@ uint32_t BufferPool::getBufferCountOfCurRes()
     return bufferCount;
 }
 
-c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, uint32_t width, uint32_t height)
+c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, uint32_t width, uint32_t height, uint32_t format)
 {
     std::unique_lock<std::mutex> listLock(mLock);
     auto itr = mBufferList.begin();
-    uint64_t res_id = (uint64_t(width) << 32) | height;
+    uint64_t res_fmt_id = (uint64_t)format << 32 | width << 16 | height;
     c2_status_t ret = C2_OK;
     bool acquired = false;
     bool createNewEntry = false;
 
     // If there's a resolution change, destory related
     // gbm buffer and erase it from the buffer list.
-    if (res_id != mCurResId) {
+    if (res_fmt_id != mCurResFmtId) {
         while (itr != mBufferList.end()) {
             // Don't free the gbm buffer be still used by display.
             // It should be freed in releaseBuffer once buffer is not used by display any more.
@@ -134,14 +172,14 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, u
             }
         }
         // set new resolution id
-        mCurResId = res_id;
+        mCurResFmtId = res_fmt_id;
     }
 
     while (!acquired) {
         itr = mBufferList.begin();
         // Need to allocate new bufer entry since the buffer
         // count is not more than the expected count.
-        if (getBufferCountOfCurRes() < mMaxBufferCount) {
+        if (getBufferCountOfCurResFmt() < mMaxBufferCount) {
             createNewEntry = true;
             ALOGV("need to create new entry, pool:%p", this);
             break;
@@ -206,9 +244,9 @@ c2_status_t BufferPool::releaseBuffer(std::shared_ptr<BufferEntryInfo> entry)
         _print_buf_entry("release", entry, this)
         while (itr != mBufferList.end()) {
             if ((*itr).get() == entry.get()) {
-                if (entry->res_id == mCurResId) {
+                if (entry->res_fmt_id == mCurResFmtId) {
                     entry->used = false;
-                    if (getBufferCountOfCurRes() > mMaxBufferCount) {
+                    if (getBufferCountOfCurResFmt() > mMaxBufferCount) {
                         _print_buf_entry ("decrease", *itr, this);
                         gbm_bo_destroy((*itr)->bo);
                         itr = mBufferList.erase(itr);
@@ -310,10 +348,14 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
     uint32_t flags = flag | GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING;
     struct gbm_bo *bo = NULL;
     int32_t bo_fd = -1, meta_fd = -1;
-    uint64_t res_id = ((uint64_t)w << 32) | h;
+    uint64_t res_fmt_id = (uint64_t)format << 32 | w << 16 | h;
     c2_status_t ret = C2_OK;
 
-    ret = mPool->acquireBuffer(mBufEntryInfo, w, h);
+    if (flags & C2MemoryUsage::READ_PROTECTED) {
+        flags |= GBM_BO_USAGE_PROTECTED_QTI;
+    }
+
+    ret = mPool->acquireBuffer(mBufEntryInfo, w, h, format);
 
     if (ret != C2_OK) {
         ALOGW("acquire buffer time out");
@@ -346,7 +388,7 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
                         gbm_device_destroy(gbm);
                         ret = C2_BAD_VALUE;
                     } else {
-                        mBufEntryInfo = std::make_shared<BufferEntryInfo>(true, res_id, bo, bo_fd, meta_fd);
+                        mBufEntryInfo = std::make_shared<BufferEntryInfo>(true, res_fmt_id, bo, bo_fd, meta_fd);
                         _print_buf_entry ("new", mBufEntryInfo, mPool.get());
                         // add new entry to buffer list
                         mPool->releaseBuffer(mBufEntryInfo);
@@ -522,7 +564,11 @@ c2_status_t C2AllocatorGBM::newGraphicAllocation( uint32_t width, uint32_t heigh
 
     std::shared_ptr<C2AllocationGBM> alloc = std::make_shared<C2AllocationGBM>
         (mGBM, mPool, width, height, format, usage.expected, mTraits->id);
-    ret = alloc->status();
+    if (alloc != nullptr) {
+      ret = alloc->status();
+    } else {
+      ret = C2_NO_MEMORY;
+    }
 
     if (ret == C2_OK) {
         *allocation = alloc;
