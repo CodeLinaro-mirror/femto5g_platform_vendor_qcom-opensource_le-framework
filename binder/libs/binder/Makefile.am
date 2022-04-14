@@ -33,6 +33,11 @@ libbinder_la_CPPFLAGS += -DUSE_GLIB -D__linux__
 libbinder_la_CPPFLAGS += -DDEBUG_REFS_CALLSTACK_ENABLED=0
 libbinder_la_LDFLAGS   = -llog -lcutils -lpthread -lutils
 
+if USE_GLIB
+libbinder_la_CPPFLAGS  += $(GLIB_CFLAGS) -include glib.h -Dstrlcat=g_strlcat
+libbinder_la_LDFLAGS += $(GLIB_LIBS)
+endif
+
 # Build binder testapp
 bin_PROGRAMS = test_binder
 
