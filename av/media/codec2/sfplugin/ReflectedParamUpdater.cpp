@@ -32,6 +32,7 @@
 #include <media/stagefright/foundation/hexdump.h>
 #else
 #include "media/stagefright/foundation/ADebug.h"
+#include "media/stagefright/foundation/AString.h"
 #endif
 
 #include "ReflectedParamUpdater.h"
@@ -52,9 +53,9 @@ std::string ReflectedParamUpdater::Dict::debugString(size_t indent_) const {
         int64_t int64Value;
         uint64_t uint64Value;
         float floatValue;
+        AString strValue;
 #ifndef _AGL_LINUX_
         sp<ABuffer> bufValue;
-        AString strValue;
 #endif
         if (it.second.find(&c2Value)) {
             switch (c2Value.type()) {
@@ -96,9 +97,9 @@ std::string ReflectedParamUpdater::Dict::debugString(size_t indent_) const {
             s << "int32_t " << it.first << " = " << int32Value;
         } else if (it.second.find(&int64Value)) {
             s << "int64_t " << it.first << " = " << int64Value;
-#ifndef _AGL_LINUX_
         } else if (it.second.find(&strValue)) {
             s << "string " << it.first << " = \"" << strValue.c_str() << "\"";
+#ifndef _AGL_LINUX_
         } else if (it.second.find(&bufValue)) {
             s << "Buffer " << it.first << " = ";
             if (bufValue != nullptr && bufValue->data() != nullptr && bufValue->size() <= 64) {
@@ -461,7 +462,6 @@ void ReflectedParamUpdater::parseMessageAndDoWork(
                 }
                 break;
             }
-#ifndef _AGL_LINUX_
             case C2FieldDescriptor::STRING: {
                 AString tmp;
                 if (!param->second.find(&tmp)) {
@@ -476,7 +476,7 @@ void ReflectedParamUpdater::parseMessageAndDoWork(
                 work(name, desc, tmp.c_str(), tmp.size() + 1);
                 break;
             }
-
+#ifndef _AGL_LINUX_
             case C2FieldDescriptor::BLOB: {
                 sp<ABuffer> tmp;
                 if (!param->second.find(&tmp) || tmp == nullptr) {
@@ -541,7 +541,6 @@ ReflectedParamUpdater::getParams(const std::vector<C2Param*> &params) const {
         uint8_t *data = (uint8_t *)param + offset;
         C2FieldDescriptor::type_t fieldType = desc.fieldDesc->type();
         switch (fieldType) {
-#ifndef _AGL_LINUX_
             case C2FieldDescriptor::STRING: {
                 size_t length = desc.fieldDesc->extent();
                 if (length == 0) {
@@ -556,7 +555,7 @@ ReflectedParamUpdater::getParams(const std::vector<C2Param*> &params) const {
                 value.set(AString((char *)data, strnlen((char *)data, length)));
                 break;
             }
-
+#ifndef _AGL_LINUX_
             case C2FieldDescriptor::BLOB: {
                 size_t length = desc.fieldDesc->extent();
                 if (length == 0) {

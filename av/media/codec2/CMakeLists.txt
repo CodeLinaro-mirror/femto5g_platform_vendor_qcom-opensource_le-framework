@@ -40,6 +40,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 #-------------------------------------------------------------------------
 
 set(CODEC2_VNDK_SOURCE
+#libstagefright foundation
+    ../libstagefright/foundation/AString.cpp
 #C2 vndk code
     vndk/util/C2ParamUtils.cpp
     vndk/util/C2InterfaceUtils.cpp
