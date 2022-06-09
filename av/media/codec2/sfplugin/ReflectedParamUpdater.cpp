@@ -25,10 +25,15 @@
 #include <C2Debug.h>
 #include <C2ParamInternal.h>
 
+#ifndef _AGL_LINUX_
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/hexdump.h>
+#else
+#include "media/stagefright/foundation/ADebug.h"
+#include "media/stagefright/foundation/AString.h"
+#endif
 
 #include "ReflectedParamUpdater.h"
 
@@ -48,8 +53,10 @@ std::string ReflectedParamUpdater::Dict::debugString(size_t indent_) const {
         int64_t int64Value;
         uint64_t uint64Value;
         float floatValue;
-        sp<ABuffer> bufValue;
         AString strValue;
+#ifndef _AGL_LINUX_
+        sp<ABuffer> bufValue;
+#endif
         if (it.second.find(&c2Value)) {
             switch (c2Value.type()) {
                 case C2Value::INT32:
@@ -92,6 +99,7 @@ std::string ReflectedParamUpdater::Dict::debugString(size_t indent_) const {
             s << "int64_t " << it.first << " = " << int64Value;
         } else if (it.second.find(&strValue)) {
             s << "string " << it.first << " = \"" << strValue.c_str() << "\"";
+#ifndef _AGL_LINUX_
         } else if (it.second.find(&bufValue)) {
             s << "Buffer " << it.first << " = ";
             if (bufValue != nullptr && bufValue->data() != nullptr && bufValue->size() <= 64) {
@@ -102,6 +110,7 @@ std::string ReflectedParamUpdater::Dict::debugString(size_t indent_) const {
             } else {
                 s << (void*)bufValue.get();
             }
+#endif
         } else {
             // dump unsupported values for debugging, this should never happen.
             s << "unsupported " << it.first;
@@ -385,6 +394,7 @@ void ReflectedParamUpdater::parseMessageAndDoWork(
             continue;
         }
 
+#ifndef _AGL_LINUX_
         // handle whole parameters
         if (!desc.fieldDesc) {
             sp<ABuffer> tmp;
@@ -400,6 +410,7 @@ void ReflectedParamUpdater::parseMessageAndDoWork(
             }
             continue;
         }
+#endif
 
         int32_t int32Value;
         int64_t int64Value;
@@ -465,7 +476,7 @@ void ReflectedParamUpdater::parseMessageAndDoWork(
                 work(name, desc, tmp.c_str(), tmp.size() + 1);
                 break;
             }
-
+#ifndef _AGL_LINUX_
             case C2FieldDescriptor::BLOB: {
                 sp<ABuffer> tmp;
                 if (!param->second.find(&tmp) || tmp == nullptr) {
@@ -479,7 +490,7 @@ void ReflectedParamUpdater::parseMessageAndDoWork(
                 work(name, desc, tmp->data(), tmp->size());
                 break;
             }
-
+#endif
             default:
                 ALOGD("Unsupported data type for %s", name.c_str());
                 break;
@@ -516,7 +527,7 @@ ReflectedParamUpdater::getParams(const std::vector<C2Param*> &params) const {
         }
         C2Param *param = paramsMap[desc.paramDesc->index()];
         Value value;
-
+#ifndef _AGL_LINUX_
         // handle whole params first
         if (!desc.fieldDesc) {
             sp<ABuffer> buf = ABuffer::CreateAsCopy(param, param->size());
@@ -524,7 +535,7 @@ ReflectedParamUpdater::getParams(const std::vector<C2Param*> &params) const {
             ret.emplace(name, value);
             continue;
         }
-
+#endif
         size_t offset = sizeof(C2Param) + desc.offset
                 + _C2ParamInspector::GetOffset(*desc.fieldDesc);
         uint8_t *data = (uint8_t *)param + offset;
@@ -544,7 +555,7 @@ ReflectedParamUpdater::getParams(const std::vector<C2Param*> &params) const {
                 value.set(AString((char *)data, strnlen((char *)data, length)));
                 break;
             }
-
+#ifndef _AGL_LINUX_
             case C2FieldDescriptor::BLOB: {
                 size_t length = desc.fieldDesc->extent();
                 if (length == 0) {
@@ -561,7 +572,7 @@ ReflectedParamUpdater::getParams(const std::vector<C2Param*> &params) const {
                 value.set(buf);
                 break;
             }
-
+#endif
             default: {
                 size_t valueSize = C2Value::SizeFor((C2Value::type_t)fieldType);
                 if (param->size() < valueSize || param->size() - valueSize < offset) {

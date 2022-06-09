@@ -23,6 +23,7 @@ endif()
 set(build_include_dirs
 #C2 includes
     core/include
+    sfplugin
     vndk/include
     vndk/internal
     vndk_platform/include)
@@ -39,6 +40,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 #-------------------------------------------------------------------------
 
 set(CODEC2_VNDK_SOURCE
+#libstagefright foundation
+    ../libstagefright/foundation/AString.cpp
 #C2 vndk code
     vndk/util/C2ParamUtils.cpp
     vndk/util/C2InterfaceUtils.cpp
@@ -47,6 +50,7 @@ set(CODEC2_VNDK_SOURCE
     vndk/C2Config.cpp
     vndk/C2Buffer.cpp
     vndk/C2Store.cpp
+    sfplugin/ReflectedParamUpdater.cpp
 #C2 platform vndk implementation
     vndk_platform/C2AllocatorGBM.cpp
     vndk/C2AllocatorIon.cpp)
@@ -59,6 +63,7 @@ set(CODEC2_VNDK_LIBS
 set(CODEC2_INCLUDES
     vndk_platform/include/
     vndk/internal/
+    sfplugin/
     core/include/
     vndk/include/)
 
