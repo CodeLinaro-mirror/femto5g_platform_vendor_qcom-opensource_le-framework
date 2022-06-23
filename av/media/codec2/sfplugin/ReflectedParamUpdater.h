@@ -30,6 +30,7 @@
 #include <media/stagefright/foundation/AString.h>
 #else
 #include "media/stagefright/foundation/AData.h"
+#include "media/stagefright/foundation/AString.h"
 #endif
 
 namespace android {
@@ -61,15 +62,15 @@ public:
 #ifndef _AGL_LINUX_
     struct Value : public AData<C2Value, int32_t, int64_t, AString, sp<ABuffer>>::Basic {
 #else
-    struct Value : public AData<C2Value, int32_t, int64_t>::Basic {
+    struct Value : public AData<C2Value, int32_t, int64_t, AString>::Basic {
 #endif
         // allow construction from base types
         Value() = default;
         explicit Value(C2Value i)            { set(i); }
         explicit Value(int32_t i)            { set(i); }
         explicit Value(int64_t i)            { set(i); }
-#ifndef _AGL_LINUX_
         explicit Value(const AString &i)     { set(i); }
+#ifndef _AGL_LINUX_
         explicit Value(const sp<ABuffer> &i) { set(i); }
 #endif
     };
