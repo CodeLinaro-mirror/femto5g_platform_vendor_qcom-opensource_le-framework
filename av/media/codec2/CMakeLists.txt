@@ -55,7 +55,7 @@ set(CODEC2_VNDK_SOURCE
     vndk_platform/C2AllocatorGBM.cpp
     vndk/C2AllocatorIon.cpp)
 add_library(codec2_vndk SHARED ${CODEC2_VNDK_SOURCE})
-target_link_libraries(codec2_vndk gbm ion cutils)
+target_link_libraries(codec2_vndk ion cutils dl)
 
 set(CODEC2_VNDK_LIBS
     codec2_vndk)
