@@ -839,6 +839,22 @@ c2_status_t C2AllocatorGBM::createC2HandleGBM(C2Handle *&handle,
     return ret;
 }
 
+c2_status_t C2AllocatorGBM::setAcquireExtBufCb(const std::function<void()> cb)
+{
+    mAcquireExtBufFunc = cb;
+
+    return C2_OK;
+}
+
+c2_status_t C2AllocatorGBM::acquireExtBuffer()
+{
+    if (mAcquireExtBufFunc) {
+        mAcquireExtBufFunc();
+    }
+
+    return C2_OK;
+}
+
 } // namespace android
 
 void _UnwrapNativeCodec2GBMMetadata(
