@@ -319,15 +319,17 @@ const C2HandleGBM* C2HandleGBM::Import(
 
 
 C2AllocationGBM::C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferPool>& pool, uint32_t width,
-        uint32_t height, uint32_t format, uint64_t usage, C2Allocator::id_t allocatorId)
-    : C2GraphicAllocation(width, height), mHandle(nullptr), mBufEntryInfo(nullptr), mBase(nullptr),
+        uint32_t height, uint32_t format, uint64_t usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle)
+    : C2GraphicAllocation(width, height), mHandle(handle), mBufEntryInfo(nullptr), mBase(nullptr),
     mMapSize(0), mPool(pool), mAllocatorId(allocatorId), mRet(C2_OK)
 {
     if (!gbm) {
         ALOGE("Invalid gbm device");
         mRet = C2_BAD_VALUE;
     } else {
-        mRet = Alloc(gbm, width, height, format, usage);
+        if (mHandle == nullptr) {
+          mRet = Alloc(gbm, width, height, format, usage);
+        }
     }
 }
 
@@ -519,6 +521,14 @@ C2AllocatorGBM::~C2AllocatorGBM()
     }
     mPool->mBufferList.clear();
 
+    for (auto const& i: mExternalBufferList) {
+        if (i->bo) {
+            gbm_bo_destroy (i->bo);
+            _print_buf_entry ("ext gbm finalize", i, nullptr);
+        }
+    }
+    mExternalBufferList.clear();
+
     if (mGBM) {
         gbm_device_destroy(mGBM);
         mGBM = NULL;
@@ -594,13 +604,15 @@ c2_status_t C2AllocatorGBM::priorGraphicAllocation(
         return C2_NO_INIT;
     }
 
-    const C2HandleGBM *gbmHandle = C2HandleGBM::Import(handle, &width, &height, &format, &flags, &stride, &size, &bo);
+    C2HandleGBM *gbmHandle = const_cast<C2HandleGBM*>(C2HandleGBM::Import(
+        handle, &width, &height, &format, &flags, &stride, &size, &bo));
 
-    if (gbmHandle == nullptr) {
-        allocation->reset(new C2AllocationGBM(mGBM, mPool, width, height, format, flags, mTraits->id));
+    if (gbmHandle != nullptr) {
+        allocation->reset(new C2AllocationGBM(mGBM, mPool, width, height, format, flags,
+                                              mTraits->id, gbmHandle));
     } else {
         ret = C2_BAD_VALUE;
-        ALOGE("priorGraphicAllocation failed due to invalid handle");
+        ALOGE("gbmHandle is NULL");
     }
 
     return ret;
@@ -615,6 +627,141 @@ c2_status_t C2AllocatorGBM::setMaxAllocationCount(uint32_t size) {
     ALOGV("set c2 allocator buffer count:%d", size);
 
     return C2_OK;
+}
+
+c2_status_t C2AllocatorGBM::setUseExternalBuffer(bool useExternal)
+{
+    mUseExternalBuffer = useExternal;
+    ALOGV("Set to use external buffer: %s", useExternal ? "True" : "False");
+
+    return C2_OK;
+}
+
+bool C2AllocatorGBM::isUseExternalBuffer()
+{
+    ALOGV("If use external buffer: %s", mUseExternalBuffer ? "True" : "False");
+
+    return mUseExternalBuffer;
+}
+
+c2_status_t C2AllocatorGBM::attachExternalFd(int fd)
+{
+    bool found = false;
+
+    if (fd <= 0) {
+        ALOGE("Invalid fd value: %d", fd);
+        return C2_BAD_VALUE;
+    }
+
+    {
+        std::lock_guard<std::mutex> listLock(mLock);
+        auto itr = mExternalBufferList.begin();
+        while (itr != mExternalBufferList.end()) {
+            if ((*itr)->bo_fd == fd) {
+                (*itr)->used = false;
+                found = true;
+                break;
+            } else {
+                ++itr;
+            }
+        }
+        if (!found) {
+            std::shared_ptr<BufferEntryInfo> buffer =
+                std::make_shared<BufferEntryInfo>(false, 0, nullptr, fd, -1);
+            mExternalBufferList.push_back(buffer);
+            ALOGV("Add new external entry to buffer list with fd=%d", fd);
+        }
+    }
+
+    mEmptyCondition.notify_one();
+    ALOGV("Notify since one buffer fd attached, fd=%d", fd);
+
+    return C2_OK;
+}
+
+c2_status_t C2AllocatorGBM::createC2HandleGBM(C2Handle *&handle,
+                              uint32_t width, uint32_t height,
+                              uint32_t format, int flag)
+{
+    bool acquired = false;
+    c2_status_t ret = C2_OK;
+    auto itr = mExternalBufferList.begin();
+
+    while (!acquired) {
+        std::unique_lock<std::mutex> listLock(mLock);
+        itr = mExternalBufferList.begin();
+        while (itr != mExternalBufferList.end()) {
+            if ((*itr)->used == false) {
+                (*itr)->used = true;
+                acquired = true;
+                break;
+            } else {
+                ++itr;
+            }
+        }
+        if (itr == mExternalBufferList.end()) {
+            ALOGV("waiting for external buffer");
+            if (std::cv_status::timeout == mEmptyCondition.wait_for(listLock, WAIT_BUF_TIME)) {
+                ALOGE("waiting for external buffer time out");
+                ret = C2_TIMED_OUT;
+                break;
+            } else {
+                ALOGV("waited for external buffer");
+            }
+        }
+    }
+
+    if (acquired) {
+        uint32_t flags = flag | GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING;
+        if (!(*itr)->bo) {
+            struct gbm_import_fd_data bufData;
+            bufData.fd = (*itr)->bo_fd;
+            bufData.width = width;
+            bufData.height = height;
+            bufData.format = format;
+
+            struct gbm_bo *gbmBo = NULL;
+            gbmBo = gbm_bo_import(mGBM, GBM_BO_IMPORT_FD, &bufData, flags);
+            if (gbmBo) {
+                (*itr)->bo = gbmBo;
+            } else {
+                ALOGE("Failed to import gbm bo for fd=%d", bufData.fd);
+                ret = C2_BAD_VALUE;
+            }
+        }
+
+        if (ret == C2_OK) {
+             C2HandleGBM *handleGBM = new C2HandleGBM();
+             handleGBM->version = C2HandleGBM::VERSION;
+             handleGBM->numFds = C2HandleGBM::NUM_FDS;
+             handleGBM->numInts = C2HandleGBM::NUM_INTS;
+             handleGBM->mFds.buffer_fd = (*itr)->bo_fd;
+
+             handleGBM->mInts.width = (*itr)->bo->width;
+             handleGBM->mInts.height = (*itr)->bo->height;
+             handleGBM->mInts.stride = (*itr)->bo->stride;
+             handleGBM->mInts.slice_height =  (*itr)->bo->aligned_height;
+             handleGBM->mInts.format = format;
+             handleGBM->mInts.usage_lo = flags;
+             handleGBM->mInts.size = (*itr)->bo->size;
+             //Use fd as the unique buffer id for C2Buffer
+             handleGBM->mInts.id = (*itr)->bo_fd;
+             handleGBM->mInts.bo_lo = (uint32_t)((uint64_t)(*itr)->bo & 0xFFFFFFFF);
+             handleGBM->mInts.bo_hi = (uint32_t)(((uint64_t)(*itr)->bo >> 32) & 0xFFFFFFFF);
+
+             ALOGV("GBM handle data: fd:%u meta_fd:%u width:%u height:%u format:%u usage_lo:%u "
+                    "usage_hi:%u stride:%u slice_height:%u size:%u, bo:%" PRIu64,
+                    handleGBM->data[0], handleGBM->data[1], handleGBM->data[2], handleGBM->data[3],
+                    handleGBM->data[4], handleGBM->data[5], handleGBM->data[6], handleGBM->data[7],
+                    handleGBM->data[8], handleGBM->data[9], (uint64_t(handleGBM->data[11]) << 32) | handleGBM->data[10]);
+
+             handle = (C2Handle*)handleGBM;
+        }
+    } else {
+        ALOGE("Failed to acquire available external buffer");
+    }
+
+    return ret;
 }
 
 } // namespace android
