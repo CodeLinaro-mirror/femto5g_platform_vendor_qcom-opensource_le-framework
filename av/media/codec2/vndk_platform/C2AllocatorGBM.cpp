@@ -448,8 +448,7 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
                 GbmLib::sFuncGbmDeviceDestroy(gbm);
                 ret = C2_BAD_VALUE;
             } else {
-                //bo_fd = gbm_bo_get_fd(bo);
-                //TODO: use gbm_bo_get_fd
+                //bo_fd = gbm_bo_get_fd(bo); //gbm_bo_get_fd() dup original fd, which lose pairing relationship between fd and metadata fd, lead to issue
                 bo_fd = bo->ion_fd;
                 if (bo_fd < 0) {
                     ALOGE("Get bo fd failed");
