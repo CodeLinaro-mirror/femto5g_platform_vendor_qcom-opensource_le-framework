@@ -117,7 +117,7 @@ c2_status_t C2PlatformGraphicBlockPool::fetchGraphicBlock(
         std::dynamic_pointer_cast<android::C2AllocatorGBM>(mAllocator);
 
     if (allocatorGBM && allocatorGBM->isUseExternalBuffer()) {
-        allocatorGBM->acquireExtBuffer();
+        allocatorGBM->acquireExtBuffer(width, height);
         C2Handle *c2Handle = nullptr;
         err = allocatorGBM->createC2HandleGBM(c2Handle, width, height, format, usage.expected);
         if (err == C2_OK) {
