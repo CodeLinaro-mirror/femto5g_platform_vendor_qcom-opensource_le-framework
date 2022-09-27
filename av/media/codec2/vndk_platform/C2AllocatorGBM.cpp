@@ -838,17 +838,39 @@ c2_status_t C2AllocatorGBM::createC2HandleGBM(C2Handle *&handle,
     return ret;
 }
 
-c2_status_t C2AllocatorGBM::setAcquireExtBufCb(const std::function<void()> cb)
+c2_status_t C2AllocatorGBM::setAcquireExtBufCb(const AcquireExtBufFunc cb)
 {
     mAcquireExtBufFunc = cb;
 
     return C2_OK;
 }
 
-c2_status_t C2AllocatorGBM::acquireExtBuffer()
+c2_status_t C2AllocatorGBM::acquireExtBuffer(uint32_t width, uint32_t height)
 {
+    bool resolution_change = false;
+    for (auto const& i: mExternalBufferList) {
+        if (i->bo && (i->bo->width != width || i->bo->height != height)) {
+            i->bo_fd = -1;  //it's specific mark, as later codec2 won't "use" this bo_fd, could set it as -1 here.
+            resolution_change = true;
+        }
+    }
+
     if (mAcquireExtBufFunc) {
-        mAcquireExtBufFunc();
+        mAcquireExtBufFunc(width, height);
+    }
+
+    if (resolution_change) {
+        ALOGV("resolution changed to %dx%d with external buffer", width, height);
+        auto itr = mExternalBufferList.begin();
+        while (itr != mExternalBufferList.end()) {
+            if ((*itr)->bo && ((*itr)->bo_fd == -1)) {
+                GbmLib::sFuncGbmBoDestory((*itr)->bo);
+                (*itr)->bo = nullptr;
+                mExternalBufferList.erase(itr++);
+            } else {
+                ++itr;
+            }
+        }
     }
 
     return C2_OK;
