@@ -179,9 +179,11 @@ void AString::erase(size_t start, size_t n) {
 }
 
 void AString::makeMutable() {
-    if (mData == kEmptyString) {
+    if (mData == NULL || mData == kEmptyString) {
         mData = strdup(kEmptyString);
     }
+
+    CHECK(mData != NULL);
 }
 
 void AString::append(const char *s) {
