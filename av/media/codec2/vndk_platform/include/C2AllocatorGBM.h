@@ -74,7 +74,38 @@
 #include <mutex>
 #include <condition_variable>
 
+using LINKGbmCreateDevice = struct gbm_device *(*) (int fd);
+using LINKGbmDeviceDestroy = void (*) (struct gbm_device *gbm_dev);
+using LINKGbmBoCreate = struct gbm_bo *(*) (struct gbm_device *gbm_dev,
+        uint32_t width, uint32_t height, uint32_t format, uint32_t usage);
+using LINKGbmPerform = int (*) (int operation, ...);
+using LINKGbmBoDestory = void (*) (struct gbm_bo *bo);
+using LINKGbmBoImport = struct gbm_bo *(*)(struct gbm_device *gbm_dev,
+        uint32_t type, void *buffer, uint32_t usage);
+
+#define DEFINE_FUNC_PTR_BY_SYM(sym)          \
+        LINK##sym GbmLib::sFunc##sym;        \
+
+#define DEFINE_STATIC_FUNC_PTR_BY_SYM(sym)   \
+        static LINK##sym sFunc##sym;         \
+
 namespace android {
+
+class GbmLib {
+public:
+    ~GbmLib();
+
+    static void loadGbm();
+    DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmCreateDevice);
+    DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmDeviceDestroy);
+    DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmBoCreate);
+    DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmPerform);
+    DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmBoDestory);
+    DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmBoImport);
+    static void* sGbmLib;
+    static bool sLoaded;
+    static std::mutex sLock;   //  mutex for loading operation
+};
 
 class C2HandleGBM;
 typedef struct GbmBuf {
@@ -174,12 +205,25 @@ public:
     c2_status_t getExtra(const C2Handle *handle, uint32_t *width, uint32_t *height,
             uint32_t *format, uint64_t *flags);
 
+    bool isUseExternalBuffer();
+    c2_status_t setUseExternalBuffer(bool useExternal);
+    c2_status_t attachExternalFd(int fd);
+    c2_status_t createC2HandleGBM(C2Handle *&handle, uint32_t width, uint32_t height,
+                                  uint32_t format, int flag);
+    c2_status_t setAcquireExtBufCb(const std::function<void()> cb);
+    c2_status_t acquireExtBuffer();
+
 private:
     c2_status_t mInit;
     std::shared_ptr<const Traits> mTraits;
     struct gbm_device *mGBM;
     std::shared_ptr<BufferPool> mPool;
     int mDevice_fd;
+    std::mutex mLock;
+    bool mUseExternalBuffer = false;
+    std::condition_variable mEmptyCondition;
+    std::list<std::shared_ptr<BufferEntryInfo> > mExternalBufferList;
+    std::function<void()> mAcquireExtBufFunc = nullptr;
 };
 
 class C2AllocationGBM : public C2GraphicAllocation {
@@ -202,7 +246,7 @@ public:
     c2_status_t Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, int flag);
 
     C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferPool> &pool, uint32_t width, uint32_t height,
-            uint32_t format, uint64_t usage, C2Allocator::id_t allocatorId);
+            uint32_t format, uint64_t usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle = nullptr);
 
     c2_status_t status() const { return mRet; };
 

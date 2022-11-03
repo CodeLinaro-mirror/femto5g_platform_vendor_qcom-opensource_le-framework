@@ -111,8 +111,22 @@ c2_status_t C2PlatformGraphicBlockPool::fetchGraphicBlock(
             C2MemoryUsage usage __unused,
             std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
 
+    c2_status_t err = C2_NO_INIT;
     std::shared_ptr<C2GraphicAllocation> alloc;
-    c2_status_t err = mAllocator->newGraphicAllocation(width, height, format, usage, &alloc);
+    std::shared_ptr<android::C2AllocatorGBM> allocatorGBM =
+        std::dynamic_pointer_cast<android::C2AllocatorGBM>(mAllocator);
+
+    if (allocatorGBM && allocatorGBM->isUseExternalBuffer()) {
+        allocatorGBM->acquireExtBuffer();
+        C2Handle *c2Handle = nullptr;
+        err = allocatorGBM->createC2HandleGBM(c2Handle, width, height, format, usage.expected);
+        if (err == C2_OK) {
+            err = mAllocator->priorGraphicAllocation(c2Handle, &alloc);
+        }
+    } else if (mAllocator) {
+        err = mAllocator->newGraphicAllocation(width, height, format, usage, &alloc);
+    }
+
     if (err != C2_OK) {
         return err;
     }

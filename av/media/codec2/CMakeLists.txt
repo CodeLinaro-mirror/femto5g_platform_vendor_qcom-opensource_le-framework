@@ -50,12 +50,14 @@ set(CODEC2_VNDK_SOURCE
     vndk/C2Config.cpp
     vndk/C2Buffer.cpp
     vndk/C2Store.cpp
+    vndk/C2AllocatorIon.cpp
     sfplugin/ReflectedParamUpdater.cpp
 #C2 platform vndk implementation
     vndk_platform/C2AllocatorGBM.cpp
-    vndk/C2AllocatorIon.cpp)
+    vndk_platform/LinuxC2Debug.cpp
+    )
 add_library(codec2_vndk SHARED ${CODEC2_VNDK_SOURCE})
-target_link_libraries(codec2_vndk gbm ion cutils)
+target_link_libraries(codec2_vndk ion cutils dl)
 
 set(CODEC2_VNDK_LIBS
     codec2_vndk)
