@@ -42,7 +42,27 @@ if (test "x${with_glib}" = "xyes"); then
         AC_SUBST(GLIB_LIBS)
 fi
 
+AC_ARG_WITH([libhardware],
+      AS_HELP_STRING([--with-libhardware],
+         [enable libhardware, building HLOS systems which use libhardware]))
+if (test "x${with_libhardware}" = "xyes"); then
+        AC_DEFINE(ENABLE_USELIBHARDWARE, 1, [Define if HLOS systems uses libhardware])
+        PKG_CHECK_MODULES(LIBHARDWARE, hardware, dummy=yes,
+                                AC_MSG_ERROR(libhardware is required))
+        AC_SUBST(LIBHARDWARE_CFLAGS)
+        AC_SUBST(LIBHARDWARE_LIBS)
+fi
+
+AC_ARG_WITH([opengl-headers],
+      AS_HELP_STRING([--with-opengl-headers],
+         [enable opengl headers, building HLOS systems which use opengl headers from libui]))
+if (test "x${with_opengl_headers}" = "xyes"); then
+        AC_DEFINE(ENABLE_OPENGL_HEADERS, 1, [Define if HLOS systems use opengl headers from libui])
+fi
+
 AM_CONDITIONAL(USE_GLIB, test "x${with_glib}" = "xyes")
+AM_CONDITIONAL(USE_LIBHARDWARE, test "x${with_libhardware}" = "xyes")
+AM_CONDITIONAL(USE_OPENGL_HEADERS, test "x${with_opengl_headers}" = "xyes")
 
 AC_SUBST([CFLAGS])
 AC_SUBST([CPPFLAGS])
