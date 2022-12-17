@@ -12,7 +12,7 @@ libcamera_client_la_CPPFLAGS   = -I$(top_srcdir)/include
 libcamera_client_la_CPPFLAGS  += @LIBCAMERA_METADATA_CFLAGS@
 libcamera_client_la_CPPFLAGS  += -std=c++11
 
-libcamera_client_la_LDFLAGS    = -lutils @LIBCAMERA_METADATA_LIBS@
+libcamera_client_la_LDFLAGS    = -lutils -lbinder @LIBCAMERA_METADATA_LIBS@
 
 # Export headers
 camera_client_includedir       = $(includedir)/camera
