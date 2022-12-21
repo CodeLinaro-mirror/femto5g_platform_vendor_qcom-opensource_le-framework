@@ -20,16 +20,58 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2DmaLinearAllocator"
-
 #include <C2DmaLinearAllocator.h>
-#include <C2Buffer.h>
+
 #include <sys/mman.h>
 #include <unistd.h>
+
+#include <memory>
+
+#include <utils/Log.h>
+#include <C2Buffer.h>
 
 namespace android {
 /* ========================================= DMA HANDLE ======================================== */
 struct C2DmaHandle : public C2Handle {
+    C2DmaHandle(int bufferFd, size_t size)
+        : C2Handle(cHeader),
+          mFds{ bufferFd },
+          mInts{ int(size & 0xFFFFFFFF), int((uint64_t(size) >> 32) & 0xFFFFFFFF), kMagic } { }
 
+    static bool isValid(const C2Handle * const o);
+
+    int bufferFd() const { return mFds.mBuffer; }
+    size_t size() const {
+        return size_t(unsigned(mInts.mSizeLo))
+                | size_t(uint64_t(unsigned(mInts.mSizeHi)) << 32);
+    }
+
+protected:
+    struct {
+        int mBuffer; // shared buffer
+    } mFds;
+    struct {
+        int mSizeLo; // low 32-bits of size
+        int mSizeHi; // high 32-bits of size
+        int mMagic;
+    } mInts;
+
+private:
+    enum {
+        kMagic = '\xc2io\x00',
+        numFds = sizeof(mFds) / sizeof(int),
+        numInts = sizeof(mInts) / sizeof(int),
+        version = sizeof(C2Handle)
+    };
+
+    const static C2Handle cHeader;
+};
+
+const C2Handle C2DmaHandle::cHeader = {
+    C2DmaHandle::version,
+    C2DmaHandle::numFds,
+    C2DmaHandle::numInts,
+    {}
 };
 
 /* ======================================= DMA ALLOCATION ====================================== */
@@ -52,7 +94,7 @@ public:
 private:
     int mFd;
     C2Allocator::id_t mId;
-    C2DmaHandle mHandle;
+    std::shared_ptr<C2DmaHandle> mHandle;
     void *mBase;
     size_t mMapSize;
 };
@@ -60,26 +102,24 @@ private:
 C2DmaLinearAllocation::C2DmaLinearAllocation(BufferAllocator& alloc, size_t size,unsigned flags, C2Allocator::id_t id)
     : C2LinearAllocation(size), mFd(-1), mBase(nullptr), mMapSize(0)
 {
-    int ret = 0;
-    mFd = alloc.Alloc("qcom,system", size, flags);
+    mFd = alloc.Alloc("qcom,system-uncached", size, flags);
     if (mFd < 0) {
-        ret = mFd;
+        ALOGE("%s failed to allocate buf", LOG_TAG);
         return;
     }
 
-    mHandle.version = 0;
-    mHandle.numFds = 1;
-    mHandle.numInts = 1;
-    mHandle.data[0] = mFd;
+    ALOGD("%s allocated fd:%d", LOG_TAG, mFd);
+
+    mHandle = std::make_shared<C2DmaHandle>(mFd, size);
     mId = id;
 }
 
 C2DmaLinearAllocation::~C2DmaLinearAllocation()
 {
     if(mFd > 0) {
+        ALOGD("%s close fd:%d", LOG_TAG, mFd);
         close(mFd);
         mFd = -1;
-        mHandle.data[0] = -1;
     }
 }
 
@@ -110,7 +150,7 @@ c2_status_t C2DmaLinearAllocation::unmap(void *addr, size_t size, C2Fence *fence
 {
     int ret = munmap(mBase, mMapSize);
     if (ret) {
-        printf("failed to ummap dma mMapSize %u", mMapSize);
+        ALOGE("%s failed to ummap dma mMapSize %zu", LOG_TAG, mMapSize);
         return C2_BAD_VALUE;
     }
     return C2_OK;
@@ -118,7 +158,7 @@ c2_status_t C2DmaLinearAllocation::unmap(void *addr, size_t size, C2Fence *fence
 
 const C2Handle *C2DmaLinearAllocation::handle() const
 {
-    return &mHandle;
+    return mHandle.get();
 }
 
 id_t C2DmaLinearAllocation::getAllocatorId() const
@@ -163,7 +203,6 @@ c2_status_t C2DmaLinearAllocator::newLinearAllocation(
         return C2_BAD_VALUE;
     }
 
-    //size_t align = 0;
     int flags = 0;
     if (usage.expected & C2MemoryUsage::CPU_READ)
         flags |= PROT_READ;
