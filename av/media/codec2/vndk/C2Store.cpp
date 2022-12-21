@@ -14,18 +14,21 @@
  * limitations under the License.
  */
 
+// Changes from Qualcomm Innovation Center are provided under the following license:
+// Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+// SPDX-License-Identifier: BSD-3-Clause-Clear
+
 #include <C2Component.h>
 #include <mutex>
 
-#ifdef _AGL_LINUX_
-#include <C2AllocatorIon.h>
 #include <C2AllocatorGBM.h>
-#else
-#include <C2AllocatorMmap.h>
-#include <C2AllocatorMmapGraphic.h>
-#endif
-
 #include <C2BlockInternal.h>
+
+#ifdef _SUPPORT_DMABUF_
+#include <C2DmaLinearAllocator.h>
+#else
+#include <C2AllocatorIon.h>
+#endif
 
 #include <map>
 #include <mutex>
@@ -201,6 +204,7 @@ public:
         MMAP_LINEAR    = 0x1000,
         MMAP_GRAPHIC   = 0x10000,
         GBM_GRAPHIC    = 0x100000,
+        DMA_LINEAR     = 0x1000000,
         BAD_ID         = C2Allocator::BAD_ID, ///< DO NOT USE
     };
 
@@ -227,19 +231,15 @@ c2_status_t C2PlatformAllocatorStore::fetchAllocator(id_t id, std::shared_ptr<C2
 
     switch (id) {
     case C2AllocatorStore::DEFAULT_LINEAR:
-#ifdef _AGL_LINUX_
-        *allocator = std::make_shared<C2AllocatorIon>(C2PlatformAllocatorStore::DEFAULT_LINEAR);
+#ifdef _SUPPORT_DMABUF_
+        *allocator = std::make_shared<C2DmaLinearAllocator>(C2PlatformAllocatorStore::DMA_LINEAR);
 #else
-        *allocator = std::make_shared<C2AllocatorMmap>(C2PlatformAllocatorStore::MMAP_LINEAR);
+        *allocator = std::make_shared<C2AllocatorIon>(C2PlatformAllocatorStore::DEFAULT_LINEAR);
 #endif
         break;
     case C2AllocatorStore::DEFAULT_GRAPHIC:
     default:
-#ifdef _AGL_LINUX_
         *allocator = std::make_shared<C2AllocatorGBM>(C2PlatformAllocatorStore::GBM_GRAPHIC);
-#else
-        *allocator = std::make_shared<C2AllocatorMmapGraphic>(C2PlatformAllocatorStore::MMAP_GRAPHIC);
-#endif
         break;
     }
     return C2_OK;
