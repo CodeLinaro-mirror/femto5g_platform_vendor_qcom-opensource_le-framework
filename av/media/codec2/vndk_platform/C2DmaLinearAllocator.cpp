@@ -87,7 +87,7 @@ public:
     virtual id_t getAllocatorId() const override;
     virtual bool equals(const std::shared_ptr<C2LinearAllocation> &other) const override;
 
-    C2DmaLinearAllocation(BufferAllocator& alloc, size_t size, unsigned flags, C2Allocator::id_t id);
+    C2DmaLinearAllocation(BufferAllocator& alloc, size_t size, C2MemoryUsage usage, C2Allocator::id_t id);
 
     c2_status_t status() const { return C2_OK; };
 
@@ -99,24 +99,32 @@ private:
     size_t mMapSize;
 };
 
-C2DmaLinearAllocation::C2DmaLinearAllocation(BufferAllocator& alloc, size_t size,unsigned flags, C2Allocator::id_t id)
+C2DmaLinearAllocation::C2DmaLinearAllocation(
+    BufferAllocator& alloc, size_t size, C2MemoryUsage usage, C2Allocator::id_t id)
     : C2LinearAllocation(size), mFd(-1), mBase(nullptr), mMapSize(0)
 {
-    mFd = alloc.Alloc("qcom,system-uncached", size, flags);
-    if (mFd < 0) {
-        ALOGE("%s failed to allocate buf", LOG_TAG);
-        return;
+    const char* buf_type = nullptr;
+
+    if (usage.expected & C2MemoryUsage::READ_PROTECTED) {
+        mFd = alloc.Alloc("system-secure", size, 0);
+        buf_type = "secure";
+    } else {
+        mFd = alloc.Alloc("qcom,system-uncached", size, 0);
+        buf_type = "non-secure";
     }
 
-    ALOGD("%s allocated fd:%d", LOG_TAG, mFd);
-
-    mHandle = std::make_shared<C2DmaHandle>(mFd, size);
-    mId = id;
+    if (mFd < 0) {
+        ALOGE("%s failed to allocate %s buf", LOG_TAG, buf_type);
+    } else {
+        ALOGD("%s allocated %s fd:%d", LOG_TAG, buf_type, mFd);
+        mHandle = std::make_shared<C2DmaHandle>(mFd, size);
+        mId = id;
+    }
 }
 
 C2DmaLinearAllocation::~C2DmaLinearAllocation()
 {
-    if(mFd > 0) {
+    if (mFd > 0) {
         ALOGD("%s close fd:%d", LOG_TAG, mFd);
         close(mFd);
         mFd = -1;
@@ -127,33 +135,55 @@ c2_status_t C2DmaLinearAllocation::map(
     size_t offset, size_t size, C2MemoryUsage usage, C2Fence *fence,
     void **addr /* nonnull */)
 {
+    c2_status_t ret = C2_OK;
     int prot = PROT_NONE;
-    if (usage.expected & C2MemoryUsage::CPU_READ) {
-        prot |= PROT_READ;
-    }
-    if (usage.expected & C2MemoryUsage::CPU_WRITE) {
-        prot |= PROT_WRITE;
-    }
-    mBase = mmap(0, size, prot, MAP_SHARED, mFd, 0);
-    if (mBase == MAP_FAILED) {
-        mBase = *addr = nullptr;
-        return C2_BAD_VALUE;
+
+    if (!addr) {
+        ALOGE("invalid addr");
+        ret = C2_BAD_VALUE;
+    } else {
+        if (usage.expected & C2MemoryUsage::CPU_READ) {
+            prot |= PROT_READ;
+        }
+        if (usage.expected & C2MemoryUsage::CPU_WRITE) {
+            prot |= PROT_WRITE;
+        }
+
+        if (prot == PROT_NONE) {
+            mBase = *addr = nullptr;
+            ALOGE("refused to map for secure buffer");
+            ret = C2_REFUSED;
+        } else {
+            mBase = mmap(0, size, prot, MAP_SHARED, mFd, 0);
+            if (mBase == MAP_FAILED) {
+                mBase = *addr = nullptr;
+                ret = C2_BAD_VALUE;
+            } else {
+                *addr = mBase;
+                mMapSize = size;
+            }
+        }
     }
 
-    *addr = mBase;
-    mMapSize = size;
-
-    return C2_OK;
+    return ret;
 }
 
 c2_status_t C2DmaLinearAllocation::unmap(void *addr, size_t size, C2Fence *fenceFd)
 {
-    int ret = munmap(mBase, mMapSize);
-    if (ret) {
-        ALOGE("%s failed to ummap dma mMapSize %zu", LOG_TAG, mMapSize);
-        return C2_BAD_VALUE;
+    c2_status_t ret = C2_OK;
+
+    if (!mMapSize || !mBase) {
+        ALOGE("invalid mMapSize:%zu mBase:%p", mMapSize, mBase);
+        ret = C2_REFUSED;
+    } else {
+        int ret = munmap(mBase, mMapSize);
+        if (ret) {
+            ALOGE("%s failed to ummap dma mMapSize %zu", LOG_TAG, mMapSize);
+            ret = C2_BAD_VALUE;
+        }
     }
-    return C2_OK;
+
+    return ret;
 }
 
 const C2Handle *C2DmaLinearAllocation::handle() const
@@ -203,13 +233,8 @@ c2_status_t C2DmaLinearAllocator::newLinearAllocation(
         return C2_BAD_VALUE;
     }
 
-    int flags = 0;
-    if (usage.expected & C2MemoryUsage::CPU_READ)
-        flags |= PROT_READ;
-    if (usage.expected & C2MemoryUsage::CPU_WRITE)
-        flags |= PROT_WRITE;
     std::shared_ptr<C2DmaLinearAllocation> alloc
-        = std::make_shared<C2DmaLinearAllocation>(mBufferAllocator, capacity, flags, getId());
+        = std::make_shared<C2DmaLinearAllocation>(mBufferAllocator, capacity, usage, getId());
     ret = alloc->status();
     if (ret == C2_OK) {
         *allocation = alloc;
