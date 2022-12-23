@@ -210,8 +210,9 @@ public:
     c2_status_t attachExternalFd(int fd);
     c2_status_t createC2HandleGBM(C2Handle *&handle, uint32_t width, uint32_t height,
                                   uint32_t format, int flag);
-    c2_status_t setAcquireExtBufCb(const std::function<void()> cb);
-    c2_status_t acquireExtBuffer();
+    using AcquireExtBufFunc = std::function<void(uint32_t, uint32_t)>;
+    c2_status_t setAcquireExtBufCb(const AcquireExtBufFunc cb);
+    c2_status_t acquireExtBuffer(uint32_t width, uint32_t height);
 
 private:
     c2_status_t mInit;
@@ -223,7 +224,7 @@ private:
     bool mUseExternalBuffer = false;
     std::condition_variable mEmptyCondition;
     std::list<std::shared_ptr<BufferEntryInfo> > mExternalBufferList;
-    std::function<void()> mAcquireExtBufFunc = nullptr;
+    AcquireExtBufFunc mAcquireExtBufFunc = nullptr;
 };
 
 class C2AllocationGBM : public C2GraphicAllocation {
