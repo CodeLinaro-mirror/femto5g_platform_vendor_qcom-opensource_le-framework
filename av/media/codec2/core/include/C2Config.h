@@ -59,6 +59,8 @@ struct C2Config {
     enum drc_compression_mode_t : int32_t;  ///< DRC compression mode
     enum drc_effect_type_t : int32_t;       ///< DRC effect type
     enum drc_album_mode_t : int32_t;        ///< DRC album mode
+    enum hdr_dynamic_metadata_type_t : uint32_t;  ///< HDR dynamic metadata type
+    enum hdr_format_t : uint32_t;           ///< HDR format
     enum intra_refresh_mode_t : uint32_t;   ///< intra refresh modes
     enum level_t : uint32_t;                ///< coding level
     enum ordinal_key_t : uint32_t;          ///< work ordering keys
@@ -185,6 +187,9 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexPictureTypeMask,
     kParamIndexPictureType,
     kParamIndexHdr10PlusMetadata,
+    kParamIndexPictureQuantization,
+    kParamIndexHdrDynamicMetadata,
+    kParamIndexHdrFormat,
 
     /* ------------------------------------ video components ------------------------------------ */
 
@@ -249,6 +254,9 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     // low latency mode
     kParamIndexLowLatencyMode, // bool
+    kParamIndexStoreDmaBufUsage,  // store, struct
+    // encoding statistics, average block qp of a frame
+    kParamIndexAverageBlockQuantization, // int32
 };
 
 }
@@ -642,6 +650,9 @@ enum C2Config::level_t : uint32_t {
     LEVEL_DV_MAIN_UHD_30,                       ///< Dolby Vision main tier uhd30
     LEVEL_DV_MAIN_UHD_48,                       ///< Dolby Vision main tier uhd48
     LEVEL_DV_MAIN_UHD_60,                       ///< Dolby Vision main tier uhd60
+    LEVEL_DV_MAIN_UHD_120,                      ///< Dolby Vision main tier uhd120
+    LEVEL_DV_MAIN_8K_30,                        ///< Dolby Vision main tier 8k30
+    LEVEL_DV_MAIN_8K_60,                        ///< Dolby Vision main tier 8k60
 
     LEVEL_DV_HIGH_HD_24 = _C2_PL_DV_BASE + 0x100,  ///< Dolby Vision high tier hd24
     LEVEL_DV_HIGH_HD_30,                        ///< Dolby Vision high tier hd30
@@ -652,6 +663,9 @@ enum C2Config::level_t : uint32_t {
     LEVEL_DV_HIGH_UHD_30,                       ///< Dolby Vision high tier uhd30
     LEVEL_DV_HIGH_UHD_48,                       ///< Dolby Vision high tier uhd48
     LEVEL_DV_HIGH_UHD_60,                       ///< Dolby Vision high tier uhd60
+    LEVEL_DV_HIGH_UHD_120,                      ///< Dolby Vision high tier uhd120
+    LEVEL_DV_HIGH_8K_30,                        ///< Dolby Vision high tier 8k30
+    LEVEL_DV_HIGH_8K_60,                        ///< Dolby Vision high tier 8k60
 
     // AV1 levels
     LEVEL_AV1_2    = _C2_PL_AV1_BASE ,          ///< AV1 Level 2
@@ -1565,6 +1579,66 @@ typedef C2StreamParam<C2Info, C2BlobValue, kParamIndexHdr10PlusMetadata>
         C2StreamHdr10PlusInfo;
 constexpr char C2_PARAMKEY_INPUT_HDR10_PLUS_INFO[] = "input.hdr10-plus-info";
 constexpr char C2_PARAMKEY_OUTPUT_HDR10_PLUS_INFO[] = "output.hdr10-plus-info";
+/**
+ * HDR dynamic metadata types
+ */
+C2ENUM(C2Config::hdr_dynamic_metadata_type_t, uint32_t,
+    HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_10,  ///< SMPTE ST 2094-10
+    HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40,  ///< SMPTE ST 2094-40
+)
+
+struct C2HdrDynamicMetadataStruct {
+    inline C2HdrDynamicMetadataStruct() { memset(this, 0, sizeof(*this)); }
+
+    inline C2HdrDynamicMetadataStruct(
+            size_t flexCount, C2Config::hdr_dynamic_metadata_type_t type)
+        : type_(type) {
+        memset(data, 0, flexCount);
+    }
+
+    C2Config::hdr_dynamic_metadata_type_t type_;
+    uint8_t data[];
+
+    DEFINE_AND_DESCRIBE_FLEX_C2STRUCT(HdrDynamicMetadata, data)
+    C2FIELD(type_, "type")
+    C2FIELD(data, "data")
+};
+
+/**
+ * Dynamic HDR Metadata Info.
+ */
+typedef C2StreamParam<C2Info, C2HdrDynamicMetadataStruct, kParamIndexHdrDynamicMetadata>
+       C2StreamHdrDynamicMetadataInfo;
+constexpr char C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO[] = "input.hdr-dynamic-info";
+constexpr char C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO[] = "output.hdr-dynamic-info";
+
+/**
+ * HDR Format
+ */
+C2ENUM(C2Config::hdr_format_t, uint32_t,
+    UNKNOWN,     ///< HDR format not known (default)
+    SDR,         ///< not HDR (SDR)
+    HLG,         ///< HLG
+    HDR10,       ///< HDR10
+    HDR10_PLUS,  ///< HDR10+
+);
+
+/**
+ * HDR Format Info
+ *
+ * This information may be present during configuration to allow encoders to
+ * prepare encoding certain HDR formats. When this information is not present
+ * before start, encoders should determine the HDR format based on the available
+ * HDR metadata on the first input frame.
+ *
+ * While this information is optional, it is not a hint. When present, encoders
+ * that do not support dynamic reconfiguration do not need to switch to the HDR
+ * format based on the metadata on the first input frame.
+ */
+typedef C2StreamParam<C2Info, C2SimpleValueStruct<C2EasyEnum<C2Config::hdr_format_t>>,
+                kParamIndexHdrFormat>
+        C2StreamHdrFormatInfo;
+constexpr char C2_PARAMKEY_HDR_FORMAT[] = "coded.hdr-format";
 
 /* ------------------------------------ block-based coding ----------------------------------- */
 
@@ -1686,6 +1760,31 @@ struct C2GopLayerStruct {
 typedef C2StreamParam<C2Tuning, C2SimpleArrayStruct<C2GopLayerStruct>, kParamIndexGop>
         C2StreamGopTuning;
 constexpr char C2_PARAMKEY_GOP[] = "coding.gop";
+
+/**
+ * Quantization
+ * min/max for each picture type
+ *
+ */
+struct C2PictureQuantizationStruct {
+    C2PictureQuantizationStruct() : type_((C2Config::picture_type_t)0),
+                                         min(INT32_MIN), max(INT32_MAX) {}
+    C2PictureQuantizationStruct(C2Config::picture_type_t type, int32_t min_, int32_t max_)
+        : type_(type), min(min_), max(max_) { }
+
+    C2Config::picture_type_t type_;
+    int32_t min;      // INT32_MIN == 'no lower bound specified'
+    int32_t max;      // INT32_MAX == 'no upper bound specified'
+
+    DEFINE_AND_DESCRIBE_C2STRUCT(PictureQuantization)
+    C2FIELD(type_, "type")
+    C2FIELD(min, "min")
+    C2FIELD(max, "max")
+};
+
+typedef C2StreamParam<C2Tuning, C2SimpleArrayStruct<C2PictureQuantizationStruct>,
+        kParamIndexPictureQuantization> C2StreamPictureQuantizationTuning;
+constexpr char C2_PARAMKEY_PICTURE_QUANTIZATION[] = "coding.qp";
 
 /**
  * Sync frame can be requested on demand by the client.
@@ -2036,6 +2135,33 @@ typedef C2GlobalParam<C2Info, C2StoreIonUsageStruct, kParamIndexStoreIonUsage>
         C2StoreIonUsageInfo;
 
 /**
+ * This structure describes the preferred DMA-Buf allocation parameters for a given memory usage.
+ */
+struct C2StoreDmaBufUsageStruct {
+    inline C2StoreDmaBufUsageStruct() { memset(this, 0, sizeof(*this)); }
+
+    inline C2StoreDmaBufUsageStruct(size_t flexCount, uint64_t usage_, uint32_t capacity_)
+        : usage(usage_), capacity(capacity_), allocFlags(0) {
+        memset(heapName, 0, flexCount);
+    }
+
+    uint64_t usage;                         ///< C2MemoryUsage
+    uint32_t capacity;                      ///< capacity
+    int32_t allocFlags;                     ///< ion allocation flags
+    char heapName[];                        ///< dmabuf heap name
+
+    DEFINE_AND_DESCRIBE_FLEX_C2STRUCT(StoreDmaBufUsage, heapName)
+    C2FIELD(usage, "usage")
+    C2FIELD(capacity, "capacity")
+    C2FIELD(allocFlags, "alloc-flags")
+    C2FIELD(heapName, "heap-name")
+};
+
+// store, private
+typedef C2GlobalParam<C2Info, C2StoreDmaBufUsageStruct, kParamIndexStoreDmaBufUsage>
+        C2StoreDmaBufUsageInfo;
+
+/**
  * Flexible pixel format descriptors
  */
 struct C2FlexiblePixelFormatDescriptorStruct {
@@ -2181,6 +2307,17 @@ inline C2TimestampGapAdjustmentStruct::C2TimestampGapAdjustmentStruct()
 
 typedef C2PortParam<C2Tuning, C2TimestampGapAdjustmentStruct> C2PortTimestampGapTuning;
 constexpr char C2_PARAMKEY_INPUT_SURFACE_TIMESTAMP_ADJUSTMENT[] = "input-surface.timestamp-adjustment";
+
+/**
+ * Video Encoding Statistics Export
+ */
+
+/**
+ * Average block QP exported from video encoder.
+ */
+typedef C2StreamParam<C2Info, C2SimpleValueStruct<int32_t>, kParamIndexAverageBlockQuantization>
+        C2AndroidStreamAverageBlockQuantizationInfo;
+constexpr char C2_PARAMKEY_AVERAGE_QP[] = "coded.average-qp";
 
 /// @}
 
