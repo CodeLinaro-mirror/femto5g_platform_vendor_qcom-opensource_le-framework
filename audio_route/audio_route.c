@@ -2,6 +2,8 @@
  * Copyright (C) 2013 The Android Open Source Project
  * Inspired by TinyHW, written by Mark Brown at Wolfson Micro
  *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -155,8 +157,14 @@ static void path_free(struct audio_route *ar)
     for (i = 0; i < ar->num_mixer_paths; i++) {
         free(ar->mixer_path[i].name);
         if (ar->mixer_path[i].setting) {
-            free(ar->mixer_path[i].setting->value.ptr);
+            size_t j;
+            for(j = 0; j < ar->mixer_path[i].length; j++) {
+                free(ar->mixer_path[i].setting[j].value.ptr);
+            }
             free(ar->mixer_path[i].setting);
+            ar->mixer_path[i].size = 0;
+            ar->mixer_path[i].length = 0;
+            ar->mixer_path[i].setting = NULL;
         }
     }
     free(ar->mixer_path);
