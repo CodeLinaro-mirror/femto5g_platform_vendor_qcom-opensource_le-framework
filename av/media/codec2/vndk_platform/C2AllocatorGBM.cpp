@@ -89,7 +89,7 @@ using namespace std::chrono_literals;
 #undef ALOGW
 
 #define _C2_GBM_LOG(level, format, args...)  \
-    syslog(LOG_INFO, "%s %d:%s: " format "\n", LOG_TAG, __LINE__, __func__, ##args)
+    syslog(level, "%s %d:%s: " format "\n", LOG_TAG, __LINE__, __func__, ##args)
 
 #define ALOGV(fmt, args...) _C2_GBM_LOG(LOG_INFO, fmt, ##args)
 #define ALOGD(fmt, args...) _C2_GBM_LOG(LOG_INFO, fmt, ##args)
@@ -591,14 +591,14 @@ C2AllocatorGBM::C2AllocatorGBM(id_t id)
             ALOGE("create gbm device failed with fd: %d", mDevice_fd);
         } else {
             mInit = C2_OK;
-            ALOGV( "Successfully created gbm device: %p", mGBM);
+            ALOGV("Successfully created gbm device: %p", mGBM);
         }
     }
 }
 
 C2AllocatorGBM::~C2AllocatorGBM()
 {
-    ALOGV( "destroy C2AllocatorGBM");
+    ALOGV("destroy C2AllocatorGBM !");
     for (auto const& i: mPool->mBufferList) {
         if (i->bo) {
             close_fd(i->bo_fd);
@@ -645,7 +645,7 @@ std::shared_ptr<const C2Allocator::Traits> C2AllocatorGBM::getTraits() const
     return mTraits;
 }
 
-c2_status_t C2AllocatorGBM::newGraphicAllocation( uint32_t width, uint32_t height,
+c2_status_t C2AllocatorGBM::newGraphicAllocation(uint32_t width, uint32_t height,
         uint32_t format, C2MemoryUsage usage,
         std::shared_ptr<C2GraphicAllocation> *allocation)
 {
