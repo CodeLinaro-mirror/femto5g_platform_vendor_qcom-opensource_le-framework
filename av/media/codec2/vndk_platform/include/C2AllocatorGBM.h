@@ -82,6 +82,7 @@ using LINKGbmPerform = int (*) (int operation, ...);
 using LINKGbmBoDestory = void (*) (struct gbm_bo *bo);
 using LINKGbmBoImport = struct gbm_bo *(*)(struct gbm_device *gbm_dev,
         uint32_t type, void *buffer, uint32_t usage);
+using LINKGbmBoGetFd = int (*) (struct gbm_bo *bo);
 
 #define DEFINE_FUNC_PTR_BY_SYM(sym)          \
         LINK##sym GbmLib::sFunc##sym;        \
@@ -102,6 +103,7 @@ public:
     DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmPerform);
     DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmBoDestory);
     DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmBoImport);
+    DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmBoGetFd);
     static void* sGbmLib;
     static bool sLoaded;
     static std::mutex sLock;   //  mutex for loading operation
