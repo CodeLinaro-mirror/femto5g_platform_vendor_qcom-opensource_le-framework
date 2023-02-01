@@ -14,7 +14,12 @@ servicemanager_LDFLAGS = -llog -lselinux -lcutils
 
 if USE_SYSTEMD
 binder_systemddir    = $(root_libdir)/systemd/system
-binder_systemd_DATA  = $(srcdir)/servicemanager.service
+if USE_BINDERFS
+binder_systemd_DATA  = $(srcdir)/services/binderfs/servicemanager.service
+binder_systemd_DATA += $(srcdir)/services/binderfs/binderfs.service
+else
+binder_systemd_DATA  = $(srcdir)/services/servicemanager.service
+endif
 binder_udevdir       = $(root_etcdir)/udev/rules.d
 binder_udev_DATA     = $(srcdir)/50-binder.rules
 endif
