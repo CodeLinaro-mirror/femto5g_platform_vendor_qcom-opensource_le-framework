@@ -31,41 +31,6 @@
 #include <C2Buffer.h>
 
 namespace android {
-/* ========================================= DMA HANDLE ======================================== */
-struct C2DmaHandle : public C2Handle {
-    C2DmaHandle(int bufferFd, size_t size)
-        : C2Handle(cHeader),
-          mFds{ bufferFd },
-          mInts{ int(size & 0xFFFFFFFF), int((uint64_t(size) >> 32) & 0xFFFFFFFF), kMagic } { }
-
-    static bool isValid(const C2Handle * const o);
-
-    int bufferFd() const { return mFds.mBuffer; }
-    size_t size() const {
-        return size_t(unsigned(mInts.mSizeLo))
-                | size_t(uint64_t(unsigned(mInts.mSizeHi)) << 32);
-    }
-
-protected:
-    struct {
-        int mBuffer; // shared buffer
-    } mFds;
-    struct {
-        int mSizeLo; // low 32-bits of size
-        int mSizeHi; // high 32-bits of size
-        int mMagic;
-    } mInts;
-
-private:
-    enum {
-        kMagic = '\xc2io\x00',
-        numFds = sizeof(mFds) / sizeof(int),
-        numInts = sizeof(mInts) / sizeof(int),
-        version = sizeof(C2Handle)
-    };
-
-    const static C2Handle cHeader;
-};
 
 const C2Handle C2DmaHandle::cHeader = {
     C2DmaHandle::version,
@@ -88,6 +53,7 @@ public:
     virtual bool equals(const std::shared_ptr<C2LinearAllocation> &other) const override;
 
     C2DmaLinearAllocation(BufferAllocator& alloc, size_t size, C2MemoryUsage usage, C2Allocator::id_t id);
+    C2DmaLinearAllocation(int bufferFd, size_t capacity, C2Allocator::id_t id);
 
     c2_status_t status() const { return C2_OK; };
 
@@ -119,6 +85,18 @@ C2DmaLinearAllocation::C2DmaLinearAllocation(
         ALOGD("%s allocated %s fd:%d", LOG_TAG, buf_type, mFd);
         mHandle = std::make_shared<C2DmaHandle>(mFd, size);
         mId = id;
+    }
+}
+
+C2DmaLinearAllocation::C2DmaLinearAllocation(
+    int bufferFd, size_t capacity, C2Allocator::id_t id)
+    : C2LinearAllocation(capacity), mFd(bufferFd), mId(id), mBase(nullptr), mMapSize(0)
+{
+    if (mFd < 0) {
+        ALOGE("%s failed to import buf since invalid fd:%d", LOG_TAG, mFd);
+    } else {
+        mHandle = std::make_shared<C2DmaHandle>(mFd, capacity);
+        ALOGV("%s import buf fd:%d size:%zu", LOG_TAG, mFd, capacity);
     }
 }
 
@@ -246,6 +224,22 @@ c2_status_t C2DmaLinearAllocator::priorLinearAllocation(
         const C2Handle *handle, std::shared_ptr<C2LinearAllocation> *allocation) {
     c2_status_t ret = C2_OK;
     *allocation = nullptr;
+
+    const C2DmaHandle *h = static_cast<const C2DmaHandle*>(handle);
+    std::shared_ptr<C2DmaLinearAllocation> alloc
+        = std::make_shared<C2DmaLinearAllocation>(h->bufferFd(), h->size(), getId());
+
+    if (alloc != nullptr) {
+        ret = alloc->status();
+    } else {
+        ret = C2_NO_MEMORY;
+    }
+    if (ret == C2_OK) {
+        *allocation = alloc;
+        native_handle_delete(const_cast<native_handle_t*>(
+                reinterpret_cast<const native_handle_t*>(handle)));
+    }
+
     return ret;
 }
 
