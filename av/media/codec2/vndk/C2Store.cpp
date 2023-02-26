@@ -32,6 +32,9 @@
 
 #include <map>
 #include <mutex>
+#ifdef _LOAD_CORE_LIB_
+#include <dlfcn.h>
+#endif
 
 namespace android {
 
@@ -247,9 +250,24 @@ c2_status_t C2PlatformAllocatorStore::fetchAllocator(id_t id, std::shared_ptr<C2
 
 namespace {
 
+#ifdef _LOAD_CORE_LIB_
+static std::list<std::unique_ptr<void, decltype(&dlclose)> > sLibs;
+#endif
+
 class _C2BlockPoolCache {
 public:
-    _C2BlockPoolCache() : mBlockPoolSeqId(C2BlockPool::PLATFORM_START + 1) {}
+    _C2BlockPoolCache() : mBlockPoolSeqId(C2BlockPool::PLATFORM_START + 1) {
+#ifdef _LOAD_CORE_LIB_
+        /* dl lib dependencies result in dependent libs loaded/closed recursively.
+         * load libqcodec2_core.so and keep it to be closed at last in case of
+         * missing shared object symbol reference when other dl libs depend on it closing ahead.
+         */
+        void *lib = dlopen("libqcodec2_core.so", RTLD_LAZY);
+        if (lib) {
+            sLibs.emplace_back(lib, dlclose);
+        }
+#endif
+    }
 
     c2_status_t _createBlockPool(
             C2PlatformAllocatorStore::id_t allocatorId,
