@@ -67,7 +67,7 @@ private:
 
 C2DmaLinearAllocation::C2DmaLinearAllocation(
     BufferAllocator& alloc, size_t size, C2MemoryUsage usage, C2Allocator::id_t id)
-    : C2LinearAllocation(size), mFd(-1), mBase(nullptr), mMapSize(0)
+    : C2LinearAllocation(size), mFd(-1), mId(C2Allocator::BAD_ID), mBase(nullptr), mMapSize(0)
 {
     const char* buf_type = nullptr;
 
