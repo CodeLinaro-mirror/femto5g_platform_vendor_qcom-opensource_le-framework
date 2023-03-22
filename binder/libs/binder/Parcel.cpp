@@ -134,6 +134,8 @@ void acquire_object(const sp<ProcessState>& proc,
             }
             return;
         }
+        default:
+            break;
     }
 
     ALOGD("Invalid object type 0x%08x", obj.hdr.type);
@@ -185,6 +187,8 @@ static void release_object(const sp<ProcessState>& proc,
             }
             return;
         }
+        default:
+            break;
     }
 
     ALOGE("Invalid object type 0x%08x", obj.hdr.type);
@@ -304,6 +308,8 @@ status_t unflatten_binder(const sp<ProcessState>& proc,
                 *out = proc->getStrongProxyForHandle(flat->handle);
                 return finish_unflatten_binder(
                     static_cast<BpBinder*>(out->get()), *flat, in);
+            default:
+                break;
         }
     }
     return BAD_TYPE;
@@ -333,6 +339,8 @@ status_t unflatten_binder(const sp<ProcessState>& proc,
                 *out = proc->getWeakProxyForHandle(flat->handle);
                 return finish_unflatten_binder(
                     static_cast<BpBinder*>(out->unsafe_get()), *flat, in);
+            default:
+                break;
         }
     }
     return BAD_TYPE;
@@ -1419,6 +1427,8 @@ int Parcel::readFileDescriptor() const
             case BINDER_TYPE_FD:
                 //ALOGI("Returning file descriptor %ld from parcel %p", flat->handle, this);
                 return flat->handle;
+            default:
+                break;
         }
     }
     return BAD_TYPE;
