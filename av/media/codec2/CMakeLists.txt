@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-error=deprecated-declarations -Wno-enum-compare")
 set(AGL_LINUX OFF CACHE BOOL "AGL(Automotive Grade Linux): ON|OFF. Default [OFF]")
 set(SUPPORT_DMABUF_HEAP OFF CACHE BOOL "Support DMA buffer heap: ON|OFF. Default [OFF]")
+set(LOAD_CORE_LIB OFF CACHE BOOL "Load core library: ON|OFF. Default [OFF]")
 
 if(AGL_LINUX)
     add_definitions(-D_AGL_LINUX_)
@@ -19,6 +20,10 @@ endif()
 
 if(SUPPORT_DMABUF_HEAP)
     add_definitions(-D_SUPPORT_DMABUF_)
+endif()
+
+if(LOAD_CORE_LIB)
+    add_definitions(-D_LOAD_CORE_LIB_)
 endif()
 
 # Build debug version

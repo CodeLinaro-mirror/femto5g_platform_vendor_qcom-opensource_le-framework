@@ -298,8 +298,8 @@ protected:
         } else {
             *base = mmap(nullptr, mapSize, prot, flags, mMapFd, mapOffset);
             ALOGV("mmap(size = %zu, prot = %d, flags = %d, mapFd = %d, offset = %zu) "
-                  "returned (%d)",
-                  mapSize, prot, flags, mMapFd, mapOffset, errno);
+                  "returned (%d) mapped base %p",
+                  mapSize, prot, flags, mMapFd, mapOffset, errno, *base);
             if (*base == MAP_FAILED) {
                 *base = *addr = nullptr;
                 err = c2_map_errno<EINVAL>(errno);
@@ -354,8 +354,8 @@ protected:
         c2_status_t err = C2_OK;
         *base = mmap(nullptr, mapSize, prot, flags, mHandle.bufferFd(), mapOffset);
         ALOGV("mmapV2(size = %zu, prot = %d, flags = %d, mapFd = %d, offset = %zu) "
-              "returned (%d)",
-              mapSize, prot, flags, mHandle.bufferFd(), mapOffset, errno);
+              "returned (%d) mapped base %p",
+              mapSize, prot, flags, mHandle.bufferFd(), mapOffset, errno, *base);
         if (*base == MAP_FAILED) {
             *base = *addr = nullptr;
             err = c2_map_errno<EINVAL>(errno);

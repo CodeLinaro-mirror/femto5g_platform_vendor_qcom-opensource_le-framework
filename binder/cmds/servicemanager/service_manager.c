@@ -26,6 +26,10 @@
 #include <cutils/log.h>
 #endif
 
+#ifndef __unused
+#define __unused  __attribute__((__unused__))
+#endif
+
 const char *str8(const uint16_t *x, size_t x_len)
 {
     static char buf[128];
@@ -175,7 +179,7 @@ uint16_t svcmgr_id[] = {
 };
 
 
-uint32_t do_find_service(struct binder_state *bs, const uint16_t *s, size_t len, uid_t uid, pid_t spid)
+uint32_t do_find_service(struct binder_state *bs __unused, const uint16_t *s, size_t len, uid_t uid, pid_t spid)
 {
     struct svcinfo *si = find_svc(s, len);
 
@@ -213,7 +217,7 @@ int do_add_service(struct binder_state *bs,
         return -1;
 
     if (!svc_can_register(s, len, spid, uid)) {
-        ALOGE("add_service('%s',%x) uid=%d - PERMISSION DENIED\n",
+        ALOGE("add_service('%s',%x) uid=%u - PERMISSION DENIED\n",
              str8(s, len), handle, uid);
         return -1;
     }
@@ -221,7 +225,7 @@ int do_add_service(struct binder_state *bs,
     si = find_svc(s, len);
     if (si) {
         if (si->handle) {
-            ALOGE("add_service('%s',%x) uid=%d - ALREADY REGISTERED, OVERRIDE\n",
+            ALOGE("add_service('%s',%x) uid=%u - ALREADY REGISTERED, OVERRIDE\n",
                  str8(s, len), handle, uid);
             svcinfo_death(bs, si);
         }
@@ -229,7 +233,7 @@ int do_add_service(struct binder_state *bs,
     } else {
         si = malloc(sizeof(*si) + (len + 1) * sizeof(uint16_t));
         if (!si) {
-            ALOGE("add_service('%s',%x) uid=%d - OUT OF MEMORY\n",
+            ALOGE("add_service('%s',%x) uid=%u - OUT OF MEMORY\n",
                  str8(s, len), handle, uid);
             return -1;
         }
@@ -323,7 +327,7 @@ int svcmgr_handler(struct binder_state *bs,
         uint32_t n = bio_get_uint32(msg);
 
         if (!svc_can_list(txn->sender_pid)) {
-            ALOGE("list_service() uid=%d - PERMISSION DENIED\n",
+            ALOGE("list_service() uid=%u - PERMISSION DENIED\n",
                     txn->sender_euid);
             return -1;
         }
@@ -337,7 +341,7 @@ int svcmgr_handler(struct binder_state *bs,
         return -1;
     }
     default:
-        ALOGE("unknown code %d\n", txn->code);
+        ALOGE("unknown code %u\n", txn->code);
         return -1;
     }
 
@@ -346,13 +350,13 @@ int svcmgr_handler(struct binder_state *bs,
 }
 
 
-static int audit_callback(void *data, security_class_t cls, char *buf, size_t len)
+static int audit_callback(void *data, security_class_t cls __unused, char *buf, size_t len)
 {
     snprintf(buf, len, "service=%s", !data ? "NULL" : (char *)data);
     return 0;
 }
 
-int main(int argc, char **argv)
+int main()
 {
     struct binder_state *bs;
 

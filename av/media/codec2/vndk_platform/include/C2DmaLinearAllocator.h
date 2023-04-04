@@ -59,6 +59,42 @@ private:
     std::shared_ptr<const Traits> mTraits;
 };
 
+/* ========================================= DMA HANDLE ======================================== */
+struct C2DmaHandle : public C2Handle {
+    C2DmaHandle(int bufferFd, size_t size)
+        : C2Handle(cHeader),
+        mFds{ bufferFd },
+        mInts{ int(size & 0xFFFFFFFF), int((uint64_t(size) >> 32) & 0xFFFFFFFF), kMagic } { }
+
+    static bool isValid(const C2Handle * const o);
+
+    int bufferFd() const { return mFds.mBuffer; }
+    size_t size() const {
+        return size_t(unsigned(mInts.mSizeLo))
+            | size_t(uint64_t(unsigned(mInts.mSizeHi)) << 32);
+    }
+
+    protected:
+    struct {
+        int mBuffer; // shared buffer
+    } mFds;
+    struct {
+        int mSizeLo; // low 32-bits of size
+        int mSizeHi; // high 32-bits of size
+        int mMagic;
+    } mInts;
+
+    private:
+    enum {
+        kMagic = '\xc2io\x00',
+        numFds = sizeof(mFds) / sizeof(int),
+        numInts = sizeof(mInts) / sizeof(int),
+        version = sizeof(C2Handle)
+    };
+
+    const static C2Handle cHeader;
+};
+
 } // namespace android
 
 #endif // _CODEC2_DMA_LINEAR_ALLOCATOR_H_
