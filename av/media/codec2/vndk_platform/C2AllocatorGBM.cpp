@@ -192,6 +192,30 @@ static inline void close_fd(int fd)
     }
 }
 
+// GPU doesn't support those formats below as rendering target.
+// 1. GBM_FORMAT_P010
+// 2. GBM_FORMAT_YCbCr_420_TP10_UBWC
+// 3. GBM_FORMAT_RGB888
+static inline uint32_t getBoRenderUsage(uint32_t format)
+{
+    uint32_t gbmUsage = GBM_BO_USE_SCANOUT;
+
+    switch (format) {
+        case GBM_FORMAT_P010:
+        case GBM_FORMAT_YCbCr_420_TP10_UBWC:
+        case GBM_FORMAT_RGB888:
+            break;
+        case GBM_FORMAT_NV12:
+            gbmUsage |= GBM_BO_USE_RENDERING;
+            break;
+        default:
+            gbmUsage |= GBM_BO_USE_RENDERING;
+            break;
+    }
+
+    return gbmUsage;
+}
+
 BufferEntryInfo::BufferEntryInfo(bool used, uint64_t res_fmt_id,
       struct gbm_bo * bo, int32_t bo_fd, int32_t meta_fd)
     : used(used), res_fmt_id(res_fmt_id), bo(bo), bo_fd(bo_fd), meta_fd(meta_fd)
@@ -431,16 +455,16 @@ C2AllocationGBM::~C2AllocationGBM()
     }
 }
 
-c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, int flag)
+c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, uint32_t usage)
 {
-    uint32_t flags = flag | GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING;
+    uint32_t usages = usage | getBoRenderUsage(format);
     struct gbm_bo *bo = NULL;
     int32_t bo_fd = -1, meta_fd = -1;
     uint64_t res_fmt_id = (uint64_t)format << 32 | w << 16 | h;
     c2_status_t ret = C2_OK;
 
-    if (flags & C2MemoryUsage::READ_PROTECTED) {
-        flags |= GBM_BO_USAGE_PROTECTED_QTI;
+    if (usages & C2MemoryUsage::READ_PROTECTED) {
+        usages |= GBM_BO_USAGE_PROTECTED_QTI;
     }
 
     ret = mPool->acquireBuffer(mBufEntryInfo, w, h, format);
@@ -453,7 +477,7 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
             bo_fd = mBufEntryInfo->bo_fd;
             meta_fd = mBufEntryInfo->meta_fd;
         } else {
-            bo = GbmLib::sFuncGbmBoCreate(gbm, w, h, format, flags);
+            bo = GbmLib::sFuncGbmBoCreate(gbm, w, h, format, usages);
 
             if (bo == NULL) {
                 ALOGE("no supported gbm bo for format %x", format);
@@ -497,7 +521,7 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
             mHandle->mInts.stride = bo->stride;
             mHandle->mInts.slice_height =  bo->aligned_height;
             mHandle->mInts.format = format;
-            mHandle->mInts.usage_lo = flags;
+            mHandle->mInts.usage_lo = usages;
             mHandle->mInts.size = bo->size;
             //Use fd as the unique buffer id for C2Buffer
             mHandle->mInts.id = bo_fd;
@@ -769,7 +793,7 @@ c2_status_t C2AllocatorGBM::attachExternalFd(int fd)
 
 c2_status_t C2AllocatorGBM::createC2HandleGBM(C2Handle *&handle,
                               uint32_t width, uint32_t height,
-                              uint32_t format, int flag)
+                              uint32_t format, uint32_t usage)
 {
     bool acquired = false;
     c2_status_t ret = C2_OK;
@@ -800,7 +824,7 @@ c2_status_t C2AllocatorGBM::createC2HandleGBM(C2Handle *&handle,
     }
 
     if (acquired) {
-        uint32_t flags = flag | GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING;
+        uint32_t usages = usage | getBoRenderUsage(format);
         if (!(*itr)->bo) {
             struct gbm_import_fd_data bufData;
             bufData.fd = (*itr)->bo_fd;
@@ -809,7 +833,7 @@ c2_status_t C2AllocatorGBM::createC2HandleGBM(C2Handle *&handle,
             bufData.format = format;
 
             struct gbm_bo *gbmBo = NULL;
-            gbmBo = GbmLib::sFuncGbmBoImport(mGBM, GBM_BO_IMPORT_FD, &bufData, flags);
+            gbmBo = GbmLib::sFuncGbmBoImport(mGBM, GBM_BO_IMPORT_FD, &bufData, usages);
             if (gbmBo) {
                 (*itr)->bo = gbmBo;
             } else {
@@ -830,7 +854,7 @@ c2_status_t C2AllocatorGBM::createC2HandleGBM(C2Handle *&handle,
              handleGBM->mInts.stride = (*itr)->bo->stride;
              handleGBM->mInts.slice_height =  (*itr)->bo->aligned_height;
              handleGBM->mInts.format = format;
-             handleGBM->mInts.usage_lo = flags;
+             handleGBM->mInts.usage_lo = usages;
              handleGBM->mInts.size = (*itr)->bo->size;
              //Use fd as the unique buffer id for C2Buffer
              handleGBM->mInts.id = (*itr)->bo_fd;

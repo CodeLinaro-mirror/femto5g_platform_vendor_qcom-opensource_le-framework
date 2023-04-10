@@ -204,14 +204,11 @@ public:
 
     static bool isValid(const C2Handle* const o);
 
-    c2_status_t getExtra(const C2Handle *handle, uint32_t *width, uint32_t *height,
-            uint32_t *format, uint64_t *flags);
-
     bool isUseExternalBuffer();
     c2_status_t setUseExternalBuffer(bool useExternal);
     c2_status_t attachExternalFd(int fd);
     c2_status_t createC2HandleGBM(C2Handle *&handle, uint32_t width, uint32_t height,
-                                  uint32_t format, int flag);
+                                  uint32_t format, uint32_t usage);
     using AcquireExtBufFunc = std::function<void(uint32_t, uint32_t)>;
     c2_status_t setAcquireExtBufCb(const AcquireExtBufFunc cb);
     c2_status_t acquireExtBuffer(uint32_t width, uint32_t height);
@@ -246,7 +243,7 @@ public:
 
     virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
 
-    c2_status_t Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, int flag);
+    c2_status_t Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, uint32_t usage);
 
     C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferPool> &pool, uint32_t width, uint32_t height,
             uint32_t format, uint64_t usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle = nullptr);
