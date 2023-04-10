@@ -31,6 +31,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <sstream>
+#include <cinttypes>
 
 #include <utils/Log.h>
 #include <C2Buffer.h>
@@ -479,12 +480,12 @@ c2_status_t C2DmaLinearAllocator::acquirePool(
 
     uint64_t key = usage.expected;
     if (auto i = mPools.find(key); i != mPools.end()) {
-        ALOGD("%s found pool of usage:%lx", LOG_TAG, key);
+        ALOGD("%s found pool of usage:0x%" PRIx64, LOG_TAG, key);
         pool = i->second;
     } else {
         pool = std::make_shared<DmaBufferPool>(&mBufferAllocator);
         if (pool) {
-            ALOGD("%s created pool of usage:%lx", LOG_TAG, key);
+            ALOGD("%s created pool of usage:0x%" PRIx64, LOG_TAG, key);
             mPools.insert({key, pool});
         } else {
             ALOGE("%s error: pool is NULL", LOG_TAG);
