@@ -279,7 +279,7 @@ void ProcessState::expungeHandle(int32_t handle, IBinder* binder)
 String8 ProcessState::makeBinderThreadName() {
     int32_t s = android_atomic_add(1, &mThreadPoolSeq);
     String8 name;
-    name.appendFormat("Binder_%X", s);
+    name.appendFormat("Binder_%X", uint32_t(s));
     return name;
 }
 
