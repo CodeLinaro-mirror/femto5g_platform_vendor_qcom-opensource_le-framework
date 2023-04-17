@@ -163,7 +163,7 @@ class BnDemo : public BnInterface<IDemo> {
 };
 
 status_t BnDemo::onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) {
-    ALOGD("BnDemo::onTransact(%i) %i", code, flags);
+    ALOGD("BnDemo::onTransact(%u) %u", code, flags);
     data.checkInterface(this);
     data.print(PLOG); endl(PLOG);
 
@@ -172,7 +172,7 @@ status_t BnDemo::onTransact(uint32_t code, const Parcel& data, Parcel* reply, ui
             INFO("%s: ALERT:", __func__);
             String16 str16(data.readString16());
             String8 str8(data.readString8());
-            INFO("%s: ALERT: str16=%s", __func__, str16.string());
+            INFO("%s: ALERT: str16=%s", __func__, (char*)str16.string());
             INFO("%s: ALERT: str8=%s", __func__, str8.string());
             alert();    // Ignoring the fixed alert string
             return NO_ERROR;

@@ -82,6 +82,7 @@ using LINKGbmPerform = int (*) (int operation, ...);
 using LINKGbmBoDestory = void (*) (struct gbm_bo *bo);
 using LINKGbmBoImport = struct gbm_bo *(*)(struct gbm_device *gbm_dev,
         uint32_t type, void *buffer, uint32_t usage);
+using LINKGbmBoGetFd = int (*) (struct gbm_bo *bo);
 
 #define DEFINE_FUNC_PTR_BY_SYM(sym)          \
         LINK##sym GbmLib::sFunc##sym;        \
@@ -102,6 +103,7 @@ public:
     DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmPerform);
     DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmBoDestory);
     DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmBoImport);
+    DEFINE_STATIC_FUNC_PTR_BY_SYM(GbmBoGetFd);
     static void* sGbmLib;
     static bool sLoaded;
     static std::mutex sLock;   //  mutex for loading operation
@@ -210,8 +212,9 @@ public:
     c2_status_t attachExternalFd(int fd);
     c2_status_t createC2HandleGBM(C2Handle *&handle, uint32_t width, uint32_t height,
                                   uint32_t format, int flag);
-    c2_status_t setAcquireExtBufCb(const std::function<void()> cb);
-    c2_status_t acquireExtBuffer();
+    using AcquireExtBufFunc = std::function<void(uint32_t, uint32_t)>;
+    c2_status_t setAcquireExtBufCb(const AcquireExtBufFunc cb);
+    c2_status_t acquireExtBuffer(uint32_t width, uint32_t height);
 
 private:
     c2_status_t mInit;
@@ -223,7 +226,7 @@ private:
     bool mUseExternalBuffer = false;
     std::condition_variable mEmptyCondition;
     std::list<std::shared_ptr<BufferEntryInfo> > mExternalBufferList;
-    std::function<void()> mAcquireExtBufFunc = nullptr;
+    AcquireExtBufFunc mAcquireExtBufFunc = nullptr;
 };
 
 class C2AllocationGBM : public C2GraphicAllocation {
