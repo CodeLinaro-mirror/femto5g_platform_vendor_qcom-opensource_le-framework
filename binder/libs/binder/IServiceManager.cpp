@@ -79,7 +79,7 @@ bool checkPermission(const String16& permission, pid_t pid, uid_t uid)
             bool res = pc->checkPermission(permission, pid, uid);
             if (res) {
                 if (startTime != 0) {
-                    ALOGI("Check passed after %d seconds for %s from uid=%d pid=%d",
+                    ALOGI("Check passed after %d seconds for %s from uid=%u pid=%d",
                             (int)((uptimeMillis()-startTime)/1000),
                             String8(permission).string(), uid, pid);
                 }
@@ -88,7 +88,7 @@ bool checkPermission(const String16& permission, pid_t pid, uid_t uid)
             
             // Is this a permission failure, or did the controller go away?
             if (IInterface::asBinder(pc)->isBinderAlive()) {
-                ALOGW("Permission failure: %s from uid=%d pid=%d",
+                ALOGW("Permission failure: %s from uid=%u pid=%d",
                         String8(permission).string(), uid, pid);
                 return false;
             }
@@ -107,7 +107,7 @@ bool checkPermission(const String16& permission, pid_t pid, uid_t uid)
             // Wait for the permission controller to come back...
             if (startTime == 0) {
                 startTime = uptimeMillis();
-                ALOGI("Waiting to check permission %s from uid=%d pid=%d",
+                ALOGI("Waiting to check permission %s from uid=%u pid=%d",
                         String8(permission).string(), uid, pid);
             }
             sleep(1);

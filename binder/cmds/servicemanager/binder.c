@@ -19,6 +19,10 @@
 #define LOG_TAG "Binder"
 #include <cutils/log.h>
 
+#ifndef __unused
+#define __unused  __attribute__((__unused__))
+#endif
+
 void bio_init_from_txn(struct binder_io *io, struct binder_transaction_data *txn);
 
 #if TRACE
@@ -278,7 +282,7 @@ int binder_parse(struct binder_state *bs, struct binder_io *bio,
             r = -1;
             break;
         default:
-            ALOGE("parse: OOPS %d\n", cmd);
+            ALOGE("parse: OOPS %u\n", cmd);
             return -1;
         }
     }
@@ -449,7 +453,7 @@ static void *bio_alloc(struct binder_io *bio, size_t size)
 }
 
 void binder_done(struct binder_state *bs,
-                 struct binder_io *msg,
+                 struct binder_io *msg __unused,
                  struct binder_io *reply)
 {
     struct {

@@ -371,8 +371,8 @@ SimpleBestFitAllocator::chunk_t* SimpleBestFitAllocator::dealloc(size_t start)
     while (cur) {
         if (cur->start == start) {
             LOG_FATAL_IF(cur->free,
-                "block at offset 0x%08lX of size 0x%08lX already freed",
-                cur->start*kMemoryAlign, cur->size*kMemoryAlign);
+                "block at offset 0x%08lX of size 0x%08X already freed",
+                cur->start*kMemoryAlign, uint32_t(cur->size*kMemoryAlign));
 
             // merge freed blocks together
             chunk_t* freed = cur;
@@ -395,8 +395,8 @@ SimpleBestFitAllocator::chunk_t* SimpleBestFitAllocator::dealloc(size_t start)
                 }
             #endif
             LOG_FATAL_IF(!freed->free,
-                "freed block at offset 0x%08lX of size 0x%08lX is not free!",
-                freed->start * kMemoryAlign, freed->size * kMemoryAlign);
+                "freed block at offset 0x%08lX of size 0x%08X is not free!",
+                freed->start * kMemoryAlign, uint32_t(freed->size * kMemoryAlign));
 
             return freed;
         }
@@ -445,9 +445,9 @@ void SimpleBestFitAllocator::dump_l(String8& result,
         int np = ((cur->next) && cur->next->prev != cur) ? 1 : 0;
         int pn = ((cur->prev) && cur->prev->next != cur) ? 2 : 0;
 
-        snprintf(buffer, SIZE, "  %3u: %p | 0x%08X | 0x%08X | %s %s\n",
-            i, cur, int(cur->start*kMemoryAlign),
-            int(cur->size*kMemoryAlign),
+        snprintf(buffer, SIZE, "  %3d: %p | 0x%08X | 0x%08X | %s %s\n",
+            i, cur, uint32_t(cur->start*kMemoryAlign),
+            uint32_t(cur->size*kMemoryAlign),
                     int(cur->free) ? "F" : "A",
                     errs[np|pn]);
         
@@ -460,7 +460,7 @@ void SimpleBestFitAllocator::dump_l(String8& result,
         cur = cur->next;
     }
     snprintf(buffer, SIZE,
-            "  size allocated: %u (%u KB)\n", int(size), int(size/1024));
+            "  size allocated: %d (%d KB)\n", int(size), int(size/1024));
     result.append(buffer);
 }
 
