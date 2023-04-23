@@ -20,9 +20,8 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <ui/ANativeObjectBase.h>
-#include <ui/PixelFormat.h>
 #include <ui/Rect.h>
+#include <utils/RefBase.h>
 #include <utils/Flattenable.h>
 #include <utils/String8.h>
 #include <utils/Timers.h>
@@ -92,6 +91,30 @@ public:
     // then INT64_MAX is returned.  If the fence is invalid or if an error
     // occurs then -1 is returned.
     nsecs_t getSignalTime() const;
+
+	enum class Status {
+		Invalid,     // Fence is invalid
+		Unsignaled,  // Fence is valid but has not yet signaled
+		Signaled,    // Fence is valid and has signaled
+	};
+
+	// getStatus() returns whether the fence has signaled yet. Prefer this to
+	// getSignalTime() or wait() if all you care about is whether the fence has
+	// signaled.
+	inline Status getStatus() {
+		// The sync_wait call underlying wait() has been measured to be
+		// significantly faster than the sync_fence_info call underlying
+		// getSignalTime(), which might otherwise appear to be the more obvious
+		// way to check whether a fence has signaled.
+		switch (wait(0)) {
+			case NO_ERROR:
+				return Status::Signaled;
+			case -ETIME:
+				return Status::Unsignaled;
+			default:
+				return Status::Invalid;
+		}
+	}
 
     // Flattenable interface
     size_t getFlattenedSize() const;
