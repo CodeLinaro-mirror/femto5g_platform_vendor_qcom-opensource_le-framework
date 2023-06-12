@@ -65,12 +65,13 @@ static int selinux_enabled;
 static char *service_manager_context;
 static struct selabel_handle* sehandle;
 
-static bool check_mac_perms(pid_t spid, const char *tctx, const char *perm, const char *name)
+static bool check_mac_perms(pid_t spid __unused, const char *tctx __unused, const char *perm __unused, const char *name __unused)
 {
     char *sctx = NULL;
     const char *class = "service_manager";
     bool allowed = true;
 
+#ifdef SELINUX_IS_ENABLE
     if (getpidcon(spid, &sctx) < 0) {
         ALOGE("SELinux: getpidcon(pid=%d) failed to retrieve pid context.\n", spid);
         return false;
@@ -80,6 +81,7 @@ static bool check_mac_perms(pid_t spid, const char *tctx, const char *perm, cons
     allowed = (result == 0);
 
     freecon(sctx);
+#endif
     return allowed;
 }
 
@@ -92,9 +94,9 @@ static bool check_mac_perms_from_getcon(pid_t spid, const char *perm)
     return check_mac_perms(spid, service_manager_context, perm, NULL);
 }
 
-static bool check_mac_perms_from_lookup(pid_t spid, const char *perm, const char *name)
+static bool check_mac_perms_from_lookup(pid_t spid __unused, const char *perm __unused, const char *name __unused)
 {
-    bool allowed;
+    bool allowed = true;
     char *tctx = NULL;
 
     if (selinux_enabled <= 0) {
@@ -106,6 +108,7 @@ static bool check_mac_perms_from_lookup(pid_t spid, const char *perm, const char
         abort();
     }
 
+#ifdef SELINUX_IS_ENABLE
     if (selabel_lookup(sehandle, &tctx, name, 0) != 0) {
         ALOGE("SELinux: No match for %s in service_contexts.\n", name);
         return false;
@@ -113,6 +116,8 @@ static bool check_mac_perms_from_lookup(pid_t spid, const char *perm, const char
 
     allowed = check_mac_perms(spid, tctx, perm, name);
     freecon(tctx);
+#endif
+
     return allowed;
 }
 
@@ -292,6 +297,7 @@ int svcmgr_handler(struct binder_state *bs,
         return -1;
     }
 
+#ifdef SELINUX_IS_ENABLE
     if (sehandle && selinux_status_updated() > 0) {
         struct selabel_handle *tmp_sehandle = NULL;// = selinux_android_service_context_handle();
         if (tmp_sehandle) {
@@ -299,6 +305,7 @@ int svcmgr_handler(struct binder_state *bs,
             sehandle = tmp_sehandle;
         }
     }
+#endif
 
     switch(txn->code) {
     case SVC_MGR_GET_SERVICE:
