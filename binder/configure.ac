@@ -32,6 +32,12 @@ AC_ARG_ENABLE(32bit-binder-ipc,
 
 AM_CONDITIONAL(IPC_32BIT, [test "x${enable_32bit_ipc}" = "xyes"])
 
+AC_ARG_ENABLE(selinux,
+      AC_HELP_STRING([--enable-selinux], [DISTRO enable selinux feature.]),
+         [selinux_enable=${enableval}], [selinux_enable="no"])
+
+AM_CONDITIONAL(SELINUX_ENABLE, [test "x${selinux_enable}" = "xyes"])
+
 AC_ARG_WITH([core_includes],
       AC_HELP_STRING([--with-core-includes=@<:@dir@:>@],
          [Specify the location of the core headers]),

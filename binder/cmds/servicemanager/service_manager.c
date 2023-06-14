@@ -13,8 +13,10 @@
 
 #include <private/android_filesystem_config.h>
 
+#ifdef SELINUX_IS_ENABLE
 //#include <selinux/android.h>
 #include <selinux/avc.h>
+#endif
 
 #include "binder.h"
 
@@ -349,12 +351,13 @@ int svcmgr_handler(struct binder_state *bs,
     return 0;
 }
 
-
+#ifdef SELINUX_IS_ENABLE
 static int audit_callback(void *data, security_class_t cls __unused, char *buf, size_t len)
 {
     snprintf(buf, len, "service=%s", !data ? "NULL" : (char *)data);
     return 0;
 }
+#endif
 
 int main()
 {
@@ -371,7 +374,8 @@ int main()
         return -1;
     }
 
-//    selinux_enabled = is_selinux_enabled();
+#ifdef SELINUX_IS_ENABLE
+    selinux_enabled = is_selinux_enabled();
 
     if (selinux_enabled > 0) {
 //        sehandle = selinux_android_service_context_handle();
@@ -386,13 +390,12 @@ int main()
             abort();
         }
     }
-
     union selinux_callback cb;
     cb.func_audit = audit_callback;
     selinux_set_callback(SELINUX_CB_AUDIT, cb);
     cb.func_log = 0;//selinux_log_callback;
     selinux_set_callback(SELINUX_CB_LOG, cb);
-
+#endif
     binder_loop(bs, svcmgr_handler);
 
     return 0;
