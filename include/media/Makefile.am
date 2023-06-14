@@ -37,3 +37,12 @@ hardware_include_HEADERS = hardware/CryptoAPI.h \
                            hardware/HDCPAPI.h \
                            hardware/OMXPluginBase.h \
                            hardware/VideoAPI.h
+
+stagefright_includedir      = $(includedir)/media/stagefright/
+stagefright_include_HEADERS = stagefright/MediaErrors.h
+
+stagefright_foundation_includedir      = $(includedir)/media/stagefright/foundation/
+stagefright_foundation_include_HEADERS = stagefright/foundation/ABase.h
+
+drm_includedir      = $(includedir)/media/drm/
+drm_include_HEADERS = drm/DrmAPI.h
