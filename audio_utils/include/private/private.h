@@ -19,7 +19,13 @@
 
 #include <stdint.h>
 
+#ifdef USE_MUSL
+#ifdef __cplusplus
+extern "C" {
+#endif
+#else
 __BEGIN_DECLS
+#endif
 
 /* Defines not necessary for external use but kept here to be common
  * to the audio_utils library.
@@ -30,6 +36,12 @@ __BEGIN_DECLS
  */
 typedef struct {uint8_t c[3];} __attribute__((__packed__)) uint8x3_t;
 
+#ifdef USE_MUSL
+#ifdef __cplusplus
+}
+#endif
+#else
 __END_DECLS
+#endif
 
 #endif /*ANDROID_AUDIO_PRIVATE_H*/
