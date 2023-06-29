@@ -382,7 +382,7 @@ int main()
     }
 
 #ifdef SELINUX_IS_ENABLE
-    selinux_enabled = is_selinux_enabled();
+//    selinux_enabled = is_selinux_enabled();
 
     if (selinux_enabled > 0) {
 //        sehandle = selinux_android_service_context_handle();
