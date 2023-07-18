@@ -582,7 +582,7 @@ c2_status_t C2AllocatorIon::newLinearAllocation(
 #endif
     std::shared_ptr<C2AllocationIon> alloc
         = std::make_shared<C2AllocationIon>(dup(mIonFd), capacity, align, heapMask, flags, getId());
-    if (alloc != nullptr) {
+    if (alloc) {
         ret = alloc->status();
     } else {
         ret = C2_NO_MEMORY;
@@ -609,7 +609,7 @@ c2_status_t C2AllocatorIon::priorLinearAllocation(
     const C2HandleIon *h = static_cast<const C2HandleIon*>(handle);
     std::shared_ptr<C2AllocationIon> alloc
         = std::make_shared<C2AllocationIon>(dup(mIonFd), h->size(), h->bufferFd(), getId());
-    if (alloc != nullptr) {
+    if (alloc) {
         ret = alloc->status();
     } else {
         ret = C2_NO_MEMORY;
