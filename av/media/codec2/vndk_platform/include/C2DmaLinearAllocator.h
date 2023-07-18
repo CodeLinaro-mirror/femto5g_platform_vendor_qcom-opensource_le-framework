@@ -24,7 +24,11 @@
 #include <BufferAllocator/BufferAllocator.h>
 #include <C2Buffer.h>
 
+#include <map>
+
 namespace android {
+
+class DmaBufferPool;
 
 class C2DmaLinearAllocator : public C2Allocator {
 public:
@@ -52,11 +56,17 @@ public:
     static bool isValid(const C2Handle* const o);
 
 private:
+    c2_status_t acquirePool(uint32_t capacity, C2MemoryUsage usage,
+            std::shared_ptr<DmaBufferPool> &pool);
+
     c2_status_t mInit;
 
     BufferAllocator mBufferAllocator;
 
     std::shared_ptr<const Traits> mTraits;
+
+    /* usage as key, the buffers of same key are managed in same pool */
+    std::map<uint64_t, std::shared_ptr<DmaBufferPool>> mPools;
 };
 
 /* ========================================= DMA HANDLE ======================================== */
@@ -65,6 +75,9 @@ struct C2DmaHandle : public C2Handle {
         : C2Handle(cHeader),
         mFds{ bufferFd },
         mInts{ int(size & 0xFFFFFFFF), int((uint64_t(size) >> 32) & 0xFFFFFFFF), kMagic } { }
+    ~C2DmaHandle() {
+        native_handle_close(this);
+    }
 
     static bool isValid(const C2Handle * const o);
 
