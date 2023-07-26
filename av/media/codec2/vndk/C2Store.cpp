@@ -125,7 +125,7 @@ c2_status_t C2PlatformGraphicBlockPool::fetchGraphicBlock(
     if (allocatorGBM && allocatorGBM->isUseExternalBuffer()) {
         allocatorGBM->acquireExtBuffer(width, height);
         C2Handle *c2Handle = nullptr;
-        err = allocatorGBM->createC2HandleGBM(c2Handle, width, height, format, usage.expected);
+        err = allocatorGBM->createC2HandleOfExtBuf(c2Handle, width, height, format, usage);
         if (err == C2_OK) {
             err = mAllocator->priorGraphicAllocation(c2Handle, &alloc);
         }
