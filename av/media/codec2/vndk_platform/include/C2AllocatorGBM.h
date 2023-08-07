@@ -154,6 +154,7 @@ class C2HandleGBM;
 typedef struct GbmBuf {
     int buffer_fd; // shared ion buffer
     int meta_buffer_fd;
+    int external_fd; // external buffer fd used to import gbm bo
 } GbmBuf;
 
 typedef struct ExtraData {
@@ -170,8 +171,6 @@ typedef struct ExtraData {
     uint32_t bo_lo;
     uint32_t bo_hi;
 } ExtraData;
-
-c2_status_t createC2HandleGBM(C2Handle *&handle, struct gbm_bo* bo, uint64_t usage);
 
 class C2HandleGBM : public C2Handle {
 
@@ -195,13 +194,14 @@ public:
 
 class BufferEntryInfo {
 public:
-  BufferEntryInfo (bool used, uint64_t res_fmt_id, struct gbm_bo *bo, int32_t bo_fd, int32_t meta_fd);
+  BufferEntryInfo (bool used, uint64_t res_fmt_id, struct gbm_bo *bo, int32_t bo_fd, int32_t meta_fd, int32_t ext_fd);
 
   bool used;
   uint64_t res_fmt_id; // id contains resolution and pixel format
   struct gbm_bo *bo;
   int32_t bo_fd;
   int32_t meta_fd;
+  int32_t ext_fd;
   bool expired;
 };
 
@@ -250,7 +250,7 @@ public:
 
     bool isUseExternalBuffer();
     c2_status_t setUseExternalBuffer(bool useExternal);
-    c2_status_t attachExternalFd(int fd);
+    c2_status_t attachExternalFd(int extFd);
     c2_status_t createC2HandleOfExtBuf(C2Handle *&handle, uint32_t width, uint32_t height,
             uint32_t format, C2MemoryUsage usage);
     using AcquireExtBufFunc = std::function<void(uint32_t, uint32_t)>;

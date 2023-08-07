@@ -479,7 +479,8 @@ c2_status_t C2DmaLinearAllocator::acquirePool(
     (void)(capacity);
 
     uint64_t key = usage.expected;
-    if (auto i = mPools.find(key); i != mPools.end()) {
+    auto i = mPools.find(key);
+    if (i != mPools.end()) {
         ALOGD("%s found pool of usage:0x%" PRIx64, LOG_TAG, key);
         pool = i->second;
     } else {
