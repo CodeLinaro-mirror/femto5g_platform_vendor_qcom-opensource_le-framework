@@ -29,6 +29,9 @@ libbinder_la_CPPFLAGS += -std=c++11 -DHAVE_PTHREADS -DHAVE_ANDROID_OS
 if IPC_32BIT
 libbinder_la_CPPFLAGS += -DBINDER_IPC_32BIT=1
 endif
+if VENDOR_BINDER_ENABLE
+libbinder_la_CPPFLAGS += -D__ANDROID_VNDK__
+endif
 libbinder_la_CPPFLAGS += -DUSE_GLIB -D__linux__
 libbinder_la_CPPFLAGS += -DDEBUG_REFS_CALLSTACK_ENABLED=0
 libbinder_la_LDFLAGS := -llog -lcutils -lpthread -lutils

@@ -44,6 +44,12 @@
 #define BINDER_VM_SIZE ((1*1024*1024) - (4096 *2))
 #define DEFAULT_MAX_BINDER_THREADS 15
 
+#ifdef __ANDROID_VNDK__
+const char* kDefaultDriver = "/dev/vndbinder";
+#else
+const char* kDefaultDriver = "/dev/binder";
+#endif
+
 
 // ---------------------------------------------------------------------------
 
@@ -310,7 +316,7 @@ void ProcessState::giveThreadPoolName() {
 
 static int open_driver()
 {
-    int fd = open("/dev/binder", O_RDWR);
+    int fd = open(kDefaultDriver, O_RDWR);
     if (fd >= 0) {
         fcntl(fd, F_SETFD, FD_CLOEXEC);
         int vers = 0;
@@ -331,7 +337,7 @@ static int open_driver()
             ALOGE("Binder ioctl to set max threads failed: %s", strerror(errno));
         }
     } else {
-        ALOGW("Opening '/dev/binder' failed: %s\n", strerror(errno));
+        ALOGW("Opening %s failed: %s\n", kDefaultDriver ,strerror(errno));
     }
     return fd;
 }
@@ -358,7 +364,7 @@ ProcessState::ProcessState()
         mVMStart = mmap(0, BINDER_VM_SIZE, PROT_READ, MAP_PRIVATE | MAP_NORESERVE, mDriverFD, 0);
         if (mVMStart == MAP_FAILED) {
             // *sigh*
-            ALOGE("Using /dev/binder failed: unable to mmap transaction memory.\n");
+            ALOGE("Using %s failed: unable to mmap transaction memory.\n", kDefaultDriver);
             close(mDriverFD);
             mDriverFD = -1;
         }
