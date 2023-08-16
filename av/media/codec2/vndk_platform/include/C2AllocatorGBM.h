@@ -125,6 +125,8 @@ using LINKGbmBoImport = struct gbm_bo *(*)(struct gbm_device *gbm_dev,
         uint32_t type, void *buffer, uint32_t usage);
 using LINKGbmBoGetFd = int (*) (struct gbm_bo *bo);
 
+using ReleaseExtBufFunc = std::function<void(int32_t)>;
+
 #define DEFINE_FUNC_PTR_BY_SYM(sym)          \
         LINK##sym GbmLib::sFunc##sym;        \
 
@@ -170,6 +172,9 @@ typedef struct ExtraData {
     uint32_t id;
     uint32_t bo_lo;
     uint32_t bo_hi;
+    /* add a flag to indicate whether the external buffer should be released in the
+     * destructor, set it to 0 if the external buffer has been pushed downstream */
+    uint32_t need_free_ext_buf;
 } ExtraData;
 
 class C2HandleGBM : public C2Handle {
@@ -255,6 +260,7 @@ public:
             uint32_t format, C2MemoryUsage usage);
     using AcquireExtBufFunc = std::function<void(uint32_t, uint32_t)>;
     c2_status_t setAcquireExtBufCb(const AcquireExtBufFunc cb);
+    c2_status_t setReleaseExtBufCb(const ReleaseExtBufFunc cb);
     c2_status_t acquireExtBuffer(uint32_t width, uint32_t height);
 
 private:
@@ -268,6 +274,7 @@ private:
     std::condition_variable mEmptyCondition;
     std::list<std::shared_ptr<BufferEntryInfo> > mExternalBufferList;
     AcquireExtBufFunc mAcquireExtBufFunc = nullptr;
+    ReleaseExtBufFunc mReleaseExtBufFunc = nullptr;
 };
 
 class C2AllocationGBM : public C2GraphicAllocation {
@@ -288,7 +295,8 @@ public:
     virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
 
     C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferPool> &pool, uint32_t width, uint32_t height,
-            uint32_t format, C2MemoryUsage usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle = nullptr);
+            uint32_t format, C2MemoryUsage usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle = nullptr,
+            ReleaseExtBufFunc releaseExtBufFunc = nullptr);
 
     c2_status_t status() const { return mRet; };
 
@@ -302,6 +310,7 @@ private:
     std::shared_ptr<BufferPool> mPool;
     C2Allocator::id_t mAllocatorId;
     c2_status_t mRet;
+    ReleaseExtBufFunc mReleaseExtBufFunc;
 };
 
 } // namespace android
