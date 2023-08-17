@@ -74,6 +74,47 @@
 #include <mutex>
 #include <condition_variable>
 
+// it's a workaround as gbm lib doesn't add such usage
+#ifndef GBM_BO_USAGE_NV12_512_QTI
+#define GBM_BO_USAGE_NV12_512_QTI          0x40000000
+#endif
+
+ // Linux platform buffer/memory usage bits.
+ // The upper 32 bits is gbm usage. The lower 32 bits is C2 usage.
+struct C2MemoryUsageGBM : public C2MemoryUsage {
+    C2MemoryUsageGBM(const C2MemoryUsage &usage, uint32_t gbmUsage)
+        : C2MemoryUsage(usage) {
+        expected = ((uint64_t)gbmUsage << 32) + usage.expected;
+    }
+
+    C2MemoryUsageGBM(const C2MemoryUsage &usage)
+        : C2MemoryUsage(usage) {
+    }
+
+    C2MemoryUsageGBM(uint64_t expected_)
+        : C2MemoryUsage(expected_) {
+    }
+
+    // Get GBM usage bits from overall usage
+    uint32_t gbmUsage() {
+        uint32_t gbmUsage = 0;
+
+        if (expected & C2MemoryUsage::READ_PROTECTED) {
+            gbmUsage |= GBM_BO_USAGE_PROTECTED_QTI;
+        }
+
+        gbmUsage |= (uint32_t)(expected >> 32);
+
+        return gbmUsage;
+    }
+
+    // Get C2 usage bits from overall uasge
+    uint64_t c2Usage() {
+        // the C2 usage is stored in lower 32-bit
+        return expected & 0xFFFFFFFF;
+    }
+};
+
 using LINKGbmCreateDevice = struct gbm_device *(*) (int fd);
 using LINKGbmDeviceDestroy = void (*) (struct gbm_device *gbm_dev);
 using LINKGbmBoCreate = struct gbm_bo *(*) (struct gbm_device *gbm_dev,
@@ -113,6 +154,7 @@ class C2HandleGBM;
 typedef struct GbmBuf {
     int buffer_fd; // shared ion buffer
     int meta_buffer_fd;
+    int external_fd; // external buffer fd used to import gbm bo
 } GbmBuf;
 
 typedef struct ExtraData {
@@ -152,13 +194,15 @@ public:
 
 class BufferEntryInfo {
 public:
-  BufferEntryInfo (bool used, uint64_t res_fmt_id, struct gbm_bo *bo, int32_t bo_fd, int32_t meta_fd);
+  BufferEntryInfo (bool used, uint64_t res_fmt_id, struct gbm_bo *bo, int32_t bo_fd, int32_t meta_fd, int32_t ext_fd);
 
   bool used;
   uint64_t res_fmt_id; // id contains resolution and pixel format
   struct gbm_bo *bo;
   int32_t bo_fd;
   int32_t meta_fd;
+  int32_t ext_fd;
+  bool expired;
 };
 
 class BufferPool {
@@ -206,9 +250,9 @@ public:
 
     bool isUseExternalBuffer();
     c2_status_t setUseExternalBuffer(bool useExternal);
-    c2_status_t attachExternalFd(int fd);
-    c2_status_t createC2HandleGBM(C2Handle *&handle, uint32_t width, uint32_t height,
-                                  uint32_t format, uint32_t usage);
+    c2_status_t attachExternalFd(int extFd);
+    c2_status_t createC2HandleOfExtBuf(C2Handle *&handle, uint32_t width, uint32_t height,
+            uint32_t format, C2MemoryUsage usage);
     using AcquireExtBufFunc = std::function<void(uint32_t, uint32_t)>;
     c2_status_t setAcquireExtBufCb(const AcquireExtBufFunc cb);
     c2_status_t acquireExtBuffer(uint32_t width, uint32_t height);
@@ -243,14 +287,14 @@ public:
 
     virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
 
-    c2_status_t Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, uint32_t usage);
-
     C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferPool> &pool, uint32_t width, uint32_t height,
-            uint32_t format, uint64_t usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle = nullptr);
+            uint32_t format, C2MemoryUsage usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle = nullptr);
 
     c2_status_t status() const { return mRet; };
 
 private:
+    c2_status_t Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, C2MemoryUsage usage);
+
     C2HandleGBM *mHandle;
     std::shared_ptr<BufferEntryInfo> mBufEntryInfo;
     void *mBase;
