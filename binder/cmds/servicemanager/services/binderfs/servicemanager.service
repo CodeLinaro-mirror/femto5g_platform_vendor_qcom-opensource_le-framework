@@ -1,0 +1,17 @@
+# Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
+[Unit]
+Description= Service manager Service
+SourcePath=/usr/bin/servicemanager
+After=binderfs.service
+Requires=binderfs.service
+
+[Service]
+User=system
+Group=system
+Restart=always
+ExecStart=/usr/bin/servicemanager
+
+[Install]
+WantedBy=multi-user.target
