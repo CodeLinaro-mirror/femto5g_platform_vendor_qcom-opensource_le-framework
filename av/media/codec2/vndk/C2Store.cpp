@@ -237,7 +237,7 @@ c2_status_t C2PlatformAllocatorStore::fetchAllocator(id_t id, std::shared_ptr<C2
 #ifdef _SUPPORT_DMABUF_
         *allocator = std::make_shared<C2DmaLinearAllocator>(C2PlatformAllocatorStore::DMA_LINEAR);
 #else
-        *allocator = std::make_shared<C2AllocatorIon>(C2PlatformAllocatorStore::DEFAULT_LINEAR);
+        *allocator = std::make_shared<C2AllocatorIon>(C2AllocatorStore::DEFAULT_LINEAR);
 #endif
         break;
     case C2AllocatorStore::DEFAULT_GRAPHIC:
