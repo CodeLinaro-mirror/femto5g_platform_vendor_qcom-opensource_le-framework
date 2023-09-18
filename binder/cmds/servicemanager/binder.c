@@ -16,8 +16,16 @@
 
 #define TRACE 0
 
-#define LOG_TAG "Binder"
 #include <cutils/log.h>
+
+#ifdef __ANDROID_VNDK__
+const char* kDefaultDriver = "/dev/vndbinder";
+#define LOG_TAG "vndBinder"
+#else
+const char* kDefaultDriver = "/dev/binder";
+#define LOG_TAG "Binder"
+#endif
+
 
 #ifndef __unused
 #define __unused  __attribute__((__unused__))
@@ -108,7 +116,7 @@ struct binder_state *binder_open(size_t mapsize)
         return NULL;
     }
 
-    bs->fd = open("/dev/binder", O_RDWR);
+    bs->fd = open(kDefaultDriver, O_RDWR);
     if (bs->fd < 0) {
         fprintf(stderr,"binder: cannot open device (%s)\n",
                 strerror(errno));
