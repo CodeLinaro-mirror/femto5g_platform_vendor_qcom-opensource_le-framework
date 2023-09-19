@@ -65,7 +65,7 @@
 #define LOG_NDEBUG 0
 #define LOG_TAG "C2AllocatorGBM"
 #include <C2AllocatorGBM.h>
-#include <utils/Log.h>
+#include <C2Debug.h>
 #include <C2Buffer.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -82,21 +82,6 @@ using namespace std::chrono_literals;
 #define WAIT_BUF_TIME 100ms
 #define INVALID_FD (-1)
 
-#ifdef _AGL_LINUX_
-#include <syslog.h>
-#undef ALOGV
-#undef ALOGD
-#undef ALOGE
-#undef ALOGW
-
-#define _C2_GBM_LOG(level, format, args...)  \
-    syslog(level, "%s %d:%s: " format "\n", LOG_TAG, __LINE__, __func__, ##args)
-
-#define ALOGV(fmt, args...) _C2_GBM_LOG(LOG_INFO, fmt, ##args)
-#define ALOGD(fmt, args...) _C2_GBM_LOG(LOG_INFO, fmt, ##args)
-#define ALOGE(fmt, args...) _C2_GBM_LOG(LOG_ERR,  fmt, ##args)
-#define ALOGW(fmt, args...) _C2_GBM_LOG(LOG_WARNING,  fmt, ##args)
-#endif
 
 #define LOAD_LIBGBM_OR_ERR_RETURN()                                 \
     do {                                                            \
@@ -111,14 +96,14 @@ using namespace std::chrono_literals;
             ALOGE ("dlopen %s error: %s", gbm_lib_name, dlerr);     \
             return;                                                 \
         }                                                           \
-        ALOGD ("loaded libgbm.so");                                 \
+        ALOGI ("loaded libgbm.so");                                 \
     } while (0)
 
 #define UNLOAD_LIBGBM()                   \
     do {                                  \
         if (sGbmLib) {                    \
             dlclose(sGbmLib);             \
-            ALOGD ("unloaded libgbm.so"); \
+            ALOGI ("unloaded libgbm.so"); \
         }                                 \
     } while (0)
 
@@ -131,7 +116,7 @@ using namespace std::chrono_literals;
             ALOGE ("dlsym %s error: %s", #sym, dlerr);              \
             return;                                                 \
         }                                                           \
-        ALOGD ("loaded symbol %s", #sym);                           \
+        ALOGI ("loaded symbol %s", #sym);                           \
     } while (0)
 
 namespace android {
@@ -173,17 +158,25 @@ void GbmLib::loadGbm() {
 // Global variable
 static GbmLib gbmLib;
 
-#define _print_buf_entry(str, buf_entry, pool)                                        \
-{                                                                                     \
-    if (buf_entry != nullptr) {                                                       \
-        ALOGV("%s entry:%p used:%d fd:%u meta_fd:%u format:0x%x wxh:%ux%u pool:%p\n", \
-            str, (buf_entry).get(), (buf_entry)->used, (buf_entry)->bo_fd,            \
-            (buf_entry)->meta_fd, (uint32_t)((buf_entry)->res_fmt_id >> 32),          \
-            (uint32_t)(((buf_entry)->res_fmt_id >> 16) & 0xFFFF),                     \
-            (uint32_t)((buf_entry)->res_fmt_id & 0xFFFF),                             \
-            (pool));                                                                  \
-   }                                                                                  \
-}
+#define _print_buf_entry(level, str, entry, pool)                            \
+do {                                                                         \
+    if (entry != nullptr) {                                                  \
+        __C2_LOG(level, "%s entry:%p bo:%p used:%d fd:%u meta_fd:%u"         \
+            " format:0x%x wxh:%ux%u expired:%u pool:%p\n",                   \
+            str, (entry).get(), (entry)->bo, (entry)->used, (entry)->bo_fd,  \
+            (entry)->meta_fd, (uint32_t)((entry)->res_fmt_id >> 32),         \
+            (uint32_t)(((entry)->res_fmt_id >> 16) & 0xFFFF),                \
+            (uint32_t)((entry)->res_fmt_id & 0xFFFF), (entry)->expired,      \
+            (pool));                                                         \
+   }                                                                         \
+} while (0)
+
+#define _print_buf_entry_i(str, entry, pool) \
+    _print_buf_entry(DEBUG_INFO, str, entry, pool)
+
+#define _print_buf_entry_d(str, entry, pool) \
+    _print_buf_entry(DEBUG_DEBUG, str, entry, pool)
+
 
 static inline void close_fd(int fd)
 {
@@ -246,7 +239,7 @@ static c2_status_t createC2HandleGBM(C2Handle *&handle, std::shared_ptr<BufferEn
             handleGBM->mInts.bo_lo = (uint32_t)((uint64_t)bo & 0xFFFFFFFF);
             handleGBM->mInts.bo_hi = (uint32_t)(((uint64_t)bo >> 32) & 0xFFFFFFFF);
 
-            ALOGV("GBM handle data: fd:%d meta_fd:%d ext_fd:%d width:%u height:%u format:0x%x "
+            ALOGD("GBM handle data: fd:%d meta_fd:%d ext_fd:%d width:%u height:%u format:0x%x "
                     "C2&GBM usage_lo:0x%x usage_hi:0x%x stride:%u slice_height:%u size:%u, bo:0x%" PRIx64,
                     handleGBM->data[0], handleGBM->data[1], handleGBM->data[2], handleGBM->data[3],
                     handleGBM->data[4], handleGBM->data[5], handleGBM->data[6], handleGBM->data[7],
@@ -285,7 +278,7 @@ c2_status_t BufferPool::setMaxBufferCount(uint32_t size)
     std::lock_guard<std::mutex> listLock(mLock);
     mMaxBufferCount = size > DEFAULT_POOL_SIZE ? size : DEFAULT_POOL_SIZE;
     mExtBufferCount = 0;
-    ALOGV("set max bufferCount of pool:%p: want:%d, result:%d, and reset extend buffer count",
+    ALOGI("set max bufferCount of pool:%p: want:%d, result:%d, and reset extend buffer count",
         this, size, mMaxBufferCount);
 
     return C2_OK;
@@ -322,7 +315,7 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, u
             // Don't free the gbm buffer be still used by display.
             // It should be freed in releaseBuffer once buffer is not used by display any more.
             if ((*itr)->used == false) {
-                _print_buf_entry ("finalize", *itr, this);
+                _print_buf_entry_i("finalize", *itr, this);
                 close_fd((*itr)->bo_fd);
                 GbmLib::sFuncGbmBoDestory((*itr)->bo);
                 itr = mBufferList.erase(itr);
@@ -340,14 +333,14 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, u
         // count is not more than the expected count.
         if (getBufferCountOfCurResFmt() < mMaxBufferCount) {
             createNewEntry = true;
-            ALOGV("need to create new entry, pool:%p", this);
+            ALOGI("need to create new entry, pool:%p", this);
             break;
         } else {
             itr = mBufferList.begin();
             while (itr != mBufferList.end()) {
                 if ((*itr)->used == false) {
                     (*itr)->used = true;
-                    _print_buf_entry("acquired", *itr, this)
+                    _print_buf_entry_d("acquired", *itr, this);
                     acquired = true;
                     break;
                 } else {
@@ -356,15 +349,15 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, u
             }
 
             if (itr == mBufferList.end()) {
-                ALOGV("waiting for buffer, pool:%p", this);
+                ALOGD("waiting for buffer, pool:%p", this);
                 if (std::cv_status::timeout == mEmptyCondition.wait_for(listLock, WAIT_BUF_TIME)) {
-                    ALOGV("waiting for buffer time out, pool:%p", this);
+                    ALOGD("waiting for buffer time out, pool:%p", this);
                     // increase buffer count to make new entry possible
                     if (mExtBufferCount < DEFAULT_EXTEND_POOL_SIZE) {
                         mMaxBufferCount++;
                         mExtBufferCount++;
                         createNewEntry = true;
-                        ALOGV("create a exteneded buf since time out");
+                        ALOGI("create a exteneded buf since time out");
                         break;
                     } else {
                         ALOGW("Warning: wait idle buf timeout and extend buf cnt(%d) reach limit, pool:%p", mExtBufferCount, this);
@@ -372,7 +365,7 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, u
                         break;
                     }
                 } else {
-                    ALOGV("waited for buffer, pool:%p", this);
+                    ALOGD("waited for buffer, pool:%p", this);
                 }
             }
         }
@@ -400,25 +393,25 @@ c2_status_t BufferPool::releaseBuffer(std::shared_ptr<BufferEntryInfo> entry)
         std::lock_guard<std::mutex> listLock(mLock);
         auto itr = mBufferList.begin();
 
-        _print_buf_entry("release", entry, this)
+        _print_buf_entry_d("release", entry, this);
         while (itr != mBufferList.end()) {
             if ((*itr).get() == entry.get()) {
                 if (entry->res_fmt_id == mCurResFmtId) {
                     entry->used = false;
                     if (getBufferCountOfCurResFmt() > mMaxBufferCount) {
-                        _print_buf_entry ("decrease", *itr, this);
+                        _print_buf_entry_i("decrease", *itr, this);
                         close_fd((*itr)->bo_fd);
                         GbmLib::sFuncGbmBoDestory((*itr)->bo);
                         itr = mBufferList.erase(itr);
-                        ALOGV("buffer list size:%zu after decreased", mBufferList.size());
+                        ALOGD("buffer list size:%zu after decreased", mBufferList.size());
                     }
                 } else {
                     // destory old buffer once reconfig
-                    _print_buf_entry ("finalize", *itr, this);
+                    _print_buf_entry_i("finalize", *itr, this);
                     close_fd((*itr)->bo_fd);
                     GbmLib::sFuncGbmBoDestory((*itr)->bo);
                     itr = mBufferList.erase(itr);
-                    ALOGV("release buffer list size:%zu", mBufferList.size());
+                    ALOGD("release buffer list size:%zu", mBufferList.size());
                 }
                 found = true;
                 break;
@@ -429,13 +422,13 @@ c2_status_t BufferPool::releaseBuffer(std::shared_ptr<BufferEntryInfo> entry)
 
         if (!found) {
             mBufferList.push_back(entry);
-            ALOGV("add new entry to buffer list, pool:%p", this);
+            ALOGD("add new entry to buffer list, pool:%p", this);
         }
     }
 
     if (ret == C2_OK) {
         mEmptyCondition.notify_one();
-        ALOGV("notify since one buffer released, pool:%p", this);
+        ALOGD("notify since one buffer released, pool:%p", this);
     }
 
     return ret;
@@ -496,7 +489,7 @@ C2AllocationGBM::C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferP
 
 C2AllocationGBM::~C2AllocationGBM()
 {
-    ALOGV("destroy allocation");
+    ALOGD("destroy allocation");
     if (mBufEntryInfo) {
         mPool->releaseBuffer(mBufEntryInfo);
     }
@@ -531,6 +524,7 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
                 ret = C2_BAD_VALUE;
             } else {
                 bo_fd = GbmLib::sFuncGbmBoGetFd(bo);
+                ALOGI("Newly created gbm bo=%p fd=%d", bo, bo_fd);
                 if (bo_fd < 0) {
                     ALOGE("Get bo fd failed");
                     GbmLib::sFuncGbmBoDestory(bo);
@@ -544,7 +538,7 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
                         ret = C2_BAD_VALUE;
                     } else {
                         mBufEntryInfo = std::make_shared<BufferEntryInfo>(true, res_fmt_id, bo, bo_fd, meta_fd, INVALID_FD);
-                        _print_buf_entry ("new", mBufEntryInfo, mPool.get());
+                        _print_buf_entry_i("new", mBufEntryInfo, mPool.get());
                         // add new entry to buffer list
                         mPool->releaseBuffer(mBufEntryInfo);
                     }
@@ -580,7 +574,7 @@ c2_status_t C2AllocationGBM::map(C2Rect rect, C2MemoryUsage usage,
     }
 
     *addr = (uint8_t*) mBase;
-    ALOGV("mapping gbm fd: %d, size: %d addr:%p", fd, size, *addr);
+    ALOGD("mapping gbm fd: %d, size: %d addr:%p", fd, size, *addr);
     mMapSize = size;
 
     return C2_OK;
@@ -589,7 +583,7 @@ c2_status_t C2AllocationGBM::map(C2Rect rect, C2MemoryUsage usage,
 c2_status_t C2AllocationGBM::unmap(uint8_t **addr, C2Rect rect, C2Fence *fence)
 {
     int ret = munmap(mBase, mMapSize);
-    ALOGV("unmap gbm buffer addr:%p size:%zu", mBase, mMapSize);
+    ALOGD("unmap gbm buffer addr:%p size:%zu", mBase, mMapSize);
 
     if (ret) {
         ALOGE("failed to ummap shmem object, errno = %d", errno);
@@ -639,19 +633,19 @@ C2AllocatorGBM::C2AllocatorGBM(id_t id)
             ALOGE("create gbm device failed with fd: %d", mDevice_fd);
         } else {
             mInit = C2_OK;
-            ALOGV("Successfully created gbm device: %p", mGBM);
+            ALOGI("Successfully created gbm device: %p", mGBM);
         }
     }
 }
 
 C2AllocatorGBM::~C2AllocatorGBM()
 {
-    ALOGV("destroy C2AllocatorGBM !");
+    ALOGI("destroy C2AllocatorGBM !");
     for (auto const& i: mPool->mBufferList) {
         if (i->bo) {
             close_fd(i->bo_fd);
             GbmLib::sFuncGbmBoDestory (i->bo);
-            _print_buf_entry ("finalize", i, mPool.get());
+            _print_buf_entry_i("finalize", i, mPool.get());
         }
     }
     mPool->mBufferList.clear();
@@ -660,7 +654,7 @@ C2AllocatorGBM::~C2AllocatorGBM()
         if (i->bo) {
             close_fd(i->bo_fd);
             GbmLib::sFuncGbmBoDestory (i->bo);
-            _print_buf_entry ("ext gbm finalize", i, nullptr);
+            _print_buf_entry_i("ext gbm finalize", i, nullptr);
         }
     }
     mExternalBufferList.clear();
@@ -762,7 +756,7 @@ bool C2AllocatorGBM::isValid(const C2Handle* const o) {
 
 c2_status_t C2AllocatorGBM::setMaxAllocationCount(uint32_t size) {
     mPool->setMaxBufferCount(size);
-    ALOGV("set c2 allocator buffer count:%d", size);
+    ALOGI("set c2 allocator buffer count:%d", size);
 
     return C2_OK;
 }
@@ -770,14 +764,14 @@ c2_status_t C2AllocatorGBM::setMaxAllocationCount(uint32_t size) {
 c2_status_t C2AllocatorGBM::setUseExternalBuffer(bool useExternal)
 {
     mUseExternalBuffer = useExternal;
-    ALOGV("Set to use external buffer: %s", useExternal ? "True" : "False");
+    ALOGI("Set to use external buffer: %s", useExternal ? "True" : "False");
 
     return C2_OK;
 }
 
 bool C2AllocatorGBM::isUseExternalBuffer()
 {
-    ALOGV("If use external buffer: %s", mUseExternalBuffer ? "True" : "False");
+    ALOGD("If use external buffer: %s", mUseExternalBuffer ? "True" : "False");
 
     return mUseExternalBuffer;
 }
@@ -805,7 +799,7 @@ c2_status_t C2AllocatorGBM::attachExternalFd(int extFd)
         std::shared_ptr<BufferEntryInfo> buffer =
             std::make_shared<BufferEntryInfo>(false, 0, nullptr, INVALID_FD, INVALID_FD, extFd);
         mExternalBufferList.push_back(buffer);
-        ALOGV("Add new external entry to buffer list with external fd=%d", extFd);
+        ALOGD("Add new external entry to buffer list with external fd=%d", extFd);
     }
 
     return C2_OK;
@@ -846,6 +840,7 @@ c2_status_t C2AllocatorGBM::createC2HandleOfExtBuf(C2Handle *&handle,
             gbmBo = GbmLib::sFuncGbmBoImport(mGBM, GBM_BO_IMPORT_FD, &bufData, gbmUsages);
             if (gbmBo) {
                 bo_fd = GbmLib::sFuncGbmBoGetFd(gbmBo);
+                ALOGI("Newly imported gbm bo=%p fd=%d from ext_fd=%d", gbmBo, bo_fd, (*itr)->ext_fd);
                 if (bo_fd < 0) {
                     ALOGE("Failed to get imported bo fd");
                     GbmLib::sFuncGbmBoDestory(gbmBo);
@@ -909,7 +904,7 @@ c2_status_t C2AllocatorGBM::acquireExtBuffer(uint32_t width, uint32_t height)
     }
 
     if (resolution_change) {
-        ALOGV("resolution changed to %dx%d with external buffer", width, height);
+        ALOGI("resolution changed to %dx%d with external buffer", width, height);
         auto itr = mExternalBufferList.begin();
         while (itr != mExternalBufferList.end()) {
             if ((*itr)->bo && (*itr)->expired) {
