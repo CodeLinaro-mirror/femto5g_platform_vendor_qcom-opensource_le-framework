@@ -209,6 +209,37 @@ static inline uint32_t getBoRenderUsage(uint32_t format)
     return gbmUsage;
 }
 
+class BufferEntryInfo {
+public:
+    BufferEntryInfo (bool used, uint64_t res_fmt_id, struct gbm_bo *bo, int32_t bo_fd, int32_t meta_fd, int32_t ext_fd);
+
+    bool used;
+    uint64_t res_fmt_id; // id contains resolution and pixel format
+    struct gbm_bo *bo;
+    int32_t bo_fd;
+    int32_t meta_fd;
+    int32_t ext_fd;
+    bool expired;
+};
+
+class BufferPool {
+public:
+    BufferPool();
+    c2_status_t acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, uint32_t width, uint32_t height, uint32_t format);
+    c2_status_t setMaxBufferCount(uint32_t size);
+    uint32_t    getMaxBufferCount(void) { return mMaxBufferCount + DEFAULT_EXTEND_POOL_SIZE; }
+    c2_status_t releaseBuffer(std::shared_ptr<BufferEntryInfo> entry);
+
+    std::list<std::shared_ptr<BufferEntryInfo> > mBufferList; // may include old and new buffer during port reconfig
+private:
+    uint32_t getBufferCountOfCurResFmt(); // get buffer count of current resolution and pixel format
+    uint64_t mCurResFmtId; // current id contain resolution and pixel format
+    uint32_t mMaxBufferCount; // means the max buffer count in pool for current sequence
+    uint32_t mExtBufferCount; // extend buffer count for time out
+    std::mutex mLock;   //  mutex for the buffer lists
+    std::condition_variable mEmptyCondition;
+};
+
 // Caller needs to free handle properly when handle is not used any more
 static c2_status_t createC2HandleGBM(C2Handle *&handle, std::shared_ptr<BufferEntryInfo> &entry, uint64_t usage)
 {
@@ -756,9 +787,16 @@ bool C2AllocatorGBM::isValid(const C2Handle* const o) {
 
 c2_status_t C2AllocatorGBM::setMaxAllocationCount(uint32_t size) {
     mPool->setMaxBufferCount(size);
-    ALOGI("set c2 allocator buffer count:%d", size);
+    ALOGI("set c2 allocator max buffer count:%u", size);
 
     return C2_OK;
+}
+
+uint32_t C2AllocatorGBM::getMaxAllocationCount(void) {
+    uint32_t count = mPool->getMaxBufferCount();
+    ALOGI("get c2 allocator max buffer count:%u", count);
+
+    return count;
 }
 
 c2_status_t C2AllocatorGBM::setUseExternalBuffer(bool useExternal)
