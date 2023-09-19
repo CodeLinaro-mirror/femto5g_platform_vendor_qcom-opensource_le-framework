@@ -18,7 +18,7 @@
 // Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
 // SPDX-License-Identifier: BSD-3-Clause-Clear
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "C2DmaLinearAllocator"
 #include <C2DmaLinearAllocator.h>
 
@@ -33,7 +33,7 @@
 #include <sstream>
 #include <cinttypes>
 
-#include <utils/Log.h>
+#include <C2Debug.h>
 #include <C2Buffer.h>
 
 using namespace std::chrono_literals;
@@ -53,7 +53,7 @@ public:
     explicit DmaBufferPool(BufferAllocator *allocator)
         : mSweepedBufferCount(0), mMaxBufferSize(0),
         mTotalBufferSize(0), mBufferAllocator(allocator) {
-        ALOGD("%s %s max pool buffer count %zu", LOG_TAG, __func__, kMaxPoolBufferCount);
+        ALOGI("max pool buffer count %zu", kMaxPoolBufferCount);
     }
     ~DmaBufferPool();
 
@@ -70,7 +70,7 @@ private:
         /* try to find a min capacity buffer that fit in requested buffer size */
         for (auto it = mFreeBuffers.begin(); it != mFreeBuffers.end(); ++it) {
             if (size <= it->first) {
-                ALOGV("capacity:fd:index %zu:%d:%d", it->first, it->second->bufferFd(), index);
+                ALOGD("capacity:fd:index %zu:%d:%d", it->first, it->second->bufferFd(), index);
                 handle = it->second;
                 mFreeBuffers.erase(it);
                 mUsedBuffers.push_back(handle);
@@ -79,8 +79,7 @@ private:
             }
             ++index;
         }
-        ALOGD("%s size:ret:index:free %zu:%u:%d:%zu", LOG_TAG,
-            size, ret, index, mFreeBuffers.size());
+        ALOGD("size:ret:index:free %zu:%u:%d:%zu", size, ret, index, mFreeBuffers.size());
         return ret;
     }
 
@@ -117,8 +116,8 @@ private:
 
 DmaBufferPool::~DmaBufferPool()
 {
-    ALOGD("%s %s free:used:sweeped %zu:%zu:%zu, pool max:sweep %zu:%zu, "
-        "total size:sweep:max %zu:%zu:%zu", LOG_TAG, __func__,
+    ALOGI("free:used:sweeped %zu:%zu:%zu, pool max:sweep %zu:%zu, "
+        "total size:sweep:max %zu:%zu:%zu",
         mFreeBuffers.size(), mUsedBuffers.size(), mSweepedBufferCount,
         kMaxPoolBufferCount, kFreeBufferCountAllowSweep,
         mTotalBufferSize, kTotalBufferSizeNeedSweep, kMaxTotalBufferSize);
@@ -137,15 +136,15 @@ DmaBufferPool::~DmaBufferPool()
     };
 
     if (mUsedBuffers.size() > 0) {
-        ALOGE("%s error: still have used buffer", LOG_TAG);
-        ALOGE("%s used %s", __func__, format(mUsedBuffers).c_str());
+        ALOGE("error: still have used buffer");
+        ALOGE("used %s", format(mUsedBuffers).c_str());
     }
 
     std::list<std::shared_ptr<C2DmaHandle>> freeBuffers;
     for (const auto &p : mFreeBuffers) {
         freeBuffers.push_back(p.second);
     }
-    ALOGD("%s free %s", __func__, format(freeBuffers).c_str());
+    ALOGI("free %s", format(freeBuffers).c_str());
     freeBuffers.clear();
 
     /* buffer handle ref count gets to zero and buffers in pool are freed. */
@@ -162,11 +161,11 @@ c2_status_t DmaBufferPool::acquireBuffer(std::shared_ptr<C2DmaHandle> &handle,
     size_t totalSize = size + mTotalBufferSize;
     bool overAllocated = isOverAllocated(total + 1, totalSize);
 
-    ALOGD("%s total count:size %zu:%zu, pool max:%zu", LOG_TAG,
+    ALOGD("total count:size %zu:%zu, pool max:%zu",
         total, mTotalBufferSize, kMaxPoolBufferCount);
 
     if (size > mMaxBufferSize && !overAllocated) {
-        ALOGD("%s size:max size %zu:%zu", LOG_TAG, size, mMaxBufferSize);
+        ALOGD("size:max size %zu:%zu", size, mMaxBufferSize);
         if (!allocateBuffer(handle, size, usage)) {
             ret = C2_NO_MEMORY;
         }
@@ -174,7 +173,7 @@ c2_status_t DmaBufferPool::acquireBuffer(std::shared_ptr<C2DmaHandle> &handle,
     }
 
     while (!findFreeBuffer(size, handle)) {
-        ALOGD("%s overAllocated:%u, wait count:%d", LOG_TAG, overAllocated, waitCount);
+        ALOGD("overAllocated:%u, wait count:%d", overAllocated, waitCount);
 
         if (!overAllocated || waitCount == kWaitCountToAllocateBuffer) {
             if (!allocateBuffer(handle, size, usage)) {
@@ -184,9 +183,9 @@ c2_status_t DmaBufferPool::acquireBuffer(std::shared_ptr<C2DmaHandle> &handle,
         } else {
             auto status = mBufferAvailable.wait_for(lock, 10ms);
             if (std::cv_status::timeout == status) {
-                ALOGD("%s timeout awaiting free buffer", LOG_TAG);
+                ALOGW("timeout awaiting free buffer, try again");
             } else {
-                ALOGD("%s awaited a free buffer back", LOG_TAG);
+                ALOGD("awaited a free buffer back");
             }
             ++waitCount;
         }
@@ -194,9 +193,9 @@ c2_status_t DmaBufferPool::acquireBuffer(std::shared_ptr<C2DmaHandle> &handle,
 
 out:
     if (C2_OK == ret) {
-        ALOGD("%s acquired buffer fd:%d size:%zu", LOG_TAG, handle->bufferFd(), handle->size());
+        ALOGD("acquired buffer fd:%d size:%zu", handle->bufferFd(), handle->size());
     } else {
-        ALOGE("%s %s failed ret:%d requested size:%zu", LOG_TAG, __func__, ret, size);
+        ALOGE("failed ret:%d requested size:%zu", ret, size);
     }
 
     return ret;
@@ -211,11 +210,11 @@ c2_status_t DmaBufferPool::releaseBuffer(std::shared_ptr<C2DmaHandle> &handle)
         mFreeBuffers.insert({handle->size(), handle});
         mUsedBuffers.remove(handle);
         mBufferAvailable.notify_one();
-        ALOGD("%s released buffer fd:%d size:%zu", LOG_TAG, handle->bufferFd(), handle->size());
+        ALOGD("released buffer fd:%d size:%zu", handle->bufferFd(), handle->size());
 
         (void)sweepFreeBuffer();
     } else {
-        ALOGE("%s %s null handle", LOG_TAG, __func__);
+        ALOGE("null handle");
         ret = C2_BAD_VALUE;
     }
 
@@ -232,7 +231,7 @@ bool DmaBufferPool::allocateBuffer(std::shared_ptr<C2DmaHandle> &handle,
     size_t totalSize = mTotalBufferSize + size;
 
     if (totalSize > kMaxTotalBufferSize) {
-        ALOGE("%s %s total size:%zu exceeds memory limit!", LOG_TAG, __func__, totalSize);
+        ALOGE("total size:%zu exceeds memory limit!", totalSize);
         ret = false;
         goto out;
     }
@@ -246,10 +245,10 @@ bool DmaBufferPool::allocateBuffer(std::shared_ptr<C2DmaHandle> &handle,
     }
 
     if (fd < 0) {
-        ALOGE("%s failed to allocate %s buf size:%zu", LOG_TAG, buf_type, size);
+        ALOGE("failed to allocate %s buf size:%zu", buf_type, size);
         ret = false;
     } else {
-        ALOGD("%s allocated %s fd:%d size:%zu", LOG_TAG, buf_type, fd, size);
+        ALOGI("allocated %s fd:%d size:%zu", buf_type, fd, size);
         handle = std::make_shared<C2DmaHandle>(fd, size);
         if (handle) {
             mUsedBuffers.push_back(handle);
@@ -257,7 +256,7 @@ bool DmaBufferPool::allocateBuffer(std::shared_ptr<C2DmaHandle> &handle,
             if (size > mMaxBufferSize)
                 mMaxBufferSize = size;
         } else {
-            ALOGE("%s %s null handle, fd:%d", LOG_TAG, __func__, fd);
+            ALOGE("null handle, fd:%d", fd);
             close (fd);
             ret = false;
         }
@@ -277,7 +276,7 @@ bool DmaBufferPool::sweepFreeBuffer(void)
     bool allowSweep = (free >= sweep) && isOverAllocated(total, mTotalBufferSize);
 
     if (allowSweep) {
-        ALOGD("%s total:free %zu:%zu, total size %zu, pool max:sweep %zu:%zu", __func__,
+        ALOGI("total:free %zu:%zu, total size %zu, pool max:sweep %zu:%zu",
             total, free, mTotalBufferSize, kMaxPoolBufferCount, sweep);
 
         /* remove and free the min size buffer */
@@ -291,7 +290,7 @@ bool DmaBufferPool::sweepFreeBuffer(void)
 
         free = mFreeBuffers.size();
         total = free + used;
-        ALOGD("%s total:free %zu:%zu, total size %zu, sweeped %zu:%d:%zu", __func__,
+        ALOGI("total:free %zu:%zu, total size %zu, sweeped %zu:%d:%zu",
             total, free, mTotalBufferSize, size, fd, mSweepedBufferCount);
     }
 
@@ -333,7 +332,7 @@ C2DmaLinearAllocation::C2DmaLinearAllocation(
 {
     mRet = mPool->acquireBuffer(mHandle, size, usage);
     if (C2_OK != mRet) {
-        ALOGE("%s failed to acquire buf ret:%d", LOG_TAG, mRet);
+        ALOGE("failed to acquire buf ret:%d", mRet);
     }
 }
 
@@ -343,30 +342,30 @@ C2DmaLinearAllocation::C2DmaLinearAllocation(
     mMapSize(0), mRet(C2_OK), mIsExternalBuffer(true)
 {
     if (bufferFd < 0) {
-        ALOGE("%s failed to import buf since invalid fd:%d", LOG_TAG, bufferFd);
+        ALOGE("failed to import buf since invalid fd:%d", bufferFd);
         mRet = C2_BAD_VALUE;
     } else {
         mHandle = std::make_shared<C2DmaHandle>(bufferFd, capacity);
-        ALOGV("%s import buf fd:%d size:%zu", LOG_TAG, bufferFd, capacity);
+        ALOGD("import buf fd:%d size:%zu", bufferFd, capacity);
     }
 }
 
 C2DmaLinearAllocation::~C2DmaLinearAllocation()
 {
     if (!mHandle) {
-        ALOGE("%s %s null handle", LOG_TAG, __func__);
+        ALOGE("null handle");
         return;
     }
 
     if (mIsExternalBuffer) {
         // closed by ~C2DmaHandle()
-        ALOGD("%s close fd:%d", LOG_TAG, mHandle->bufferFd());
+        ALOGD("shall close fd:%d in ~C2DmaHandle", mHandle->bufferFd());
     } else {
         //ALOGD("%s release buffer fd:%d", LOG_TAG, mHandle->bufferFd());
         if (mPool) {
             mPool->releaseBuffer(mHandle);
         } else {
-            ALOGE("%s null pool", LOG_TAG);
+            ALOGE("null pool");
         }
     }
 }
@@ -379,7 +378,7 @@ c2_status_t C2DmaLinearAllocation::map(
     int prot = PROT_NONE;
 
     if (!mHandle) {
-        ALOGE("%s %s null handle", LOG_TAG, __func__);
+        ALOGE("null handle");
     } else if (!addr) {
         ALOGE("invalid addr");
     } else {
@@ -422,7 +421,7 @@ c2_status_t C2DmaLinearAllocation::unmap(void *addr, size_t size, C2Fence *fence
     } else {
         int ret = munmap(mBase, mMapSize);
         if (ret) {
-            ALOGE("%s failed to ummap dma mMapSize %zu", LOG_TAG, mMapSize);
+            ALOGE("failed to ummap dma mMapSize %zu", mMapSize);
             ret = C2_BAD_VALUE;
         }
     }
@@ -453,11 +452,11 @@ C2DmaLinearAllocator::C2DmaLinearAllocator(id_t id)
     C2MemoryUsage maxUsage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
     Traits traits = { "linux.allocator.dma", id, LINEAR, minUsage, maxUsage };
     mTraits = std::make_shared<Traits>(traits);
-    ALOGD("%s this:id %p:%u", __func__, this, id);
+    ALOGI("this:id %p:%u", this, id);
 }
 
 C2DmaLinearAllocator::~C2DmaLinearAllocator() {
-    ALOGD("%s this:id %p:%u", __func__, this, getId());
+    ALOGI("this:id %p:%u", this, getId());
 }
 
 C2Allocator::id_t C2DmaLinearAllocator::getId() const {
@@ -481,15 +480,15 @@ c2_status_t C2DmaLinearAllocator::acquirePool(
     uint64_t key = usage.expected;
     auto i = mPools.find(key);
     if (i != mPools.end()) {
-        ALOGD("%s found pool of usage:0x%" PRIx64, LOG_TAG, key);
+        ALOGD("found pool of usage:0x%" PRIx64, key);
         pool = i->second;
     } else {
         pool = std::make_shared<DmaBufferPool>(&mBufferAllocator);
         if (pool) {
-            ALOGD("%s created pool of usage:0x%" PRIx64, LOG_TAG, key);
+            ALOGI("created pool of usage:0x%" PRIx64, key);
             mPools.insert({key, pool});
         } else {
-            ALOGE("%s error: pool is NULL", LOG_TAG);
+            ALOGE("error: pool is NULL");
             ret = C2_NO_MEMORY;
         }
     }
@@ -500,7 +499,7 @@ c2_status_t C2DmaLinearAllocator::acquirePool(
 c2_status_t C2DmaLinearAllocator::newLinearAllocation(
         uint32_t capacity, C2MemoryUsage usage, std::shared_ptr<C2LinearAllocation> *allocation) {
     c2_status_t ret = C2_OK;
-    ALOGD("%s %s this:id:capacity %p:%u:%u", LOG_TAG, __func__, this, getId(), capacity);
+    ALOGD("this:id:capacity %p:%u:%u", this, getId(), capacity);
 
     if (allocation == nullptr) {
         return C2_BAD_VALUE;
@@ -521,7 +520,7 @@ c2_status_t C2DmaLinearAllocator::newLinearAllocation(
         }
     } else {
         ret = C2_NO_MEMORY;
-        ALOGE("%s %s null alloc", LOG_TAG, __func__);
+        ALOGE("null alloc");
     }
 
     return ret;
@@ -540,6 +539,7 @@ c2_status_t C2DmaLinearAllocator::priorLinearAllocation(
         ret = alloc->status();
     } else {
         ret = C2_NO_MEMORY;
+        ALOGE("null alloc");
     }
     if (ret == C2_OK) {
         *allocation = alloc;
