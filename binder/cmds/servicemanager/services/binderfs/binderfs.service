@@ -1,0 +1,21 @@
+# Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
+[Unit]
+Description=Create binderfs for binder usage
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/mkdir -p /dev/binderfs
+ExecStart=/bin/mount -t binder binder /dev/binderfs
+ExecStart=/bin/chmod 0666 /dev/binderfs/hwbinder
+ExecStart=/bin/chmod 0666 /dev/binderfs/binder
+ExecStart=/bin/chmod 0666 /dev/binderfs/vndbinder
+ExecStartPost=/bin/ln -sf /dev/binderfs/binder /dev/binder
+ExecStartPost=/bin/ln -sf /dev/binderfs/hwbinder /dev/hwbinder
+ExecStartPost=/bin/ln -sf /dev/binderfs/vndbinder /dev/vndbinder
+RemainAfterExit=yes
+
+[Install]
+WantedBy=local-fs.target
