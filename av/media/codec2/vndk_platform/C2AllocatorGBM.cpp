@@ -269,6 +269,7 @@ static c2_status_t createC2HandleGBM(C2Handle *&handle, std::shared_ptr<BufferEn
             handleGBM->mInts.id = entry->bo_fd;
             handleGBM->mInts.bo_lo = (uint32_t)((uint64_t)bo & 0xFFFFFFFF);
             handleGBM->mInts.bo_hi = (uint32_t)(((uint64_t)bo >> 32) & 0xFFFFFFFF);
+            handleGBM->mInts.need_free_ext_buf = 1;
 
             ALOGD("GBM handle data: fd:%d meta_fd:%d ext_fd:%d width:%u height:%u format:0x%x "
                     "C2&GBM usage_lo:0x%x usage_hi:0x%x stride:%u slice_height:%u size:%u, bo:0x%" PRIx64,
@@ -504,9 +505,10 @@ const C2HandleGBM* C2HandleGBM::Import(
 
 
 C2AllocationGBM::C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferPool>& pool, uint32_t width,
-        uint32_t height, uint32_t format, C2MemoryUsage usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle)
+        uint32_t height, uint32_t format, C2MemoryUsage usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle,
+        ReleaseExtBufFunc releaseExtBufFunc)
     : C2GraphicAllocation(width, height), mHandle(handle), mBufEntryInfo(nullptr), mBase(nullptr),
-    mMapSize(0), mPool(pool), mAllocatorId(allocatorId), mRet(C2_OK)
+    mMapSize(0), mPool(pool), mAllocatorId(allocatorId), mRet(C2_OK), mReleaseExtBufFunc(releaseExtBufFunc)
 {
     if (!gbm) {
         ALOGE("Invalid gbm device");
@@ -525,6 +527,11 @@ C2AllocationGBM::~C2AllocationGBM()
         mPool->releaseBuffer(mBufEntryInfo);
     }
     if (mHandle) {
+        if (mHandle->mFds.external_fd > 0 && mHandle->mInts.need_free_ext_buf) {
+            if (mReleaseExtBufFunc) {
+                mReleaseExtBufFunc(mHandle->mFds.external_fd);
+            }
+        }
         delete mHandle;
         mHandle = nullptr;
     }
@@ -772,7 +779,7 @@ c2_status_t C2AllocatorGBM::priorGraphicAllocation(
 
     if (gbmHandle != nullptr) {
         allocation->reset(new C2AllocationGBM(mGBM, mPool, width, height, format, usages,
-                                              mTraits->id, gbmHandle));
+                                              mTraits->id, gbmHandle, mReleaseExtBufFunc));
     } else {
         ret = C2_BAD_VALUE;
         ALOGE("gbmHandle is NULL");
@@ -923,6 +930,13 @@ c2_status_t C2AllocatorGBM::createC2HandleOfExtBuf(C2Handle *&handle,
 c2_status_t C2AllocatorGBM::setAcquireExtBufCb(const AcquireExtBufFunc cb)
 {
     mAcquireExtBufFunc = cb;
+
+    return C2_OK;
+}
+
+c2_status_t C2AllocatorGBM::setReleaseExtBufCb(const ReleaseExtBufFunc cb)
+{
+    mReleaseExtBufFunc = cb;
 
     return C2_OK;
 }
