@@ -33,6 +33,13 @@ AC_ARG_ENABLE(32bit-binder-ipc,
 
 AM_CONDITIONAL(IPC_32BIT, [test "x${enable_32bit_ipc}" = "xyes"])
 
+AC_ARG_WITH(binderfs,
+        AS_HELP_STRING([--with-binderfs], [use binderfs instead of binder device]),
+        [BINDERFS="yes"],
+        [BINDERFS="no"])
+
+AM_CONDITIONAL([USE_BINDERFS], [test "x${BINDERFS}" != "xno"])
+
 AC_ARG_WITH([core_includes],
       AS_HELP_STRING([--with-core-includes=@<:@dir@:>@],
          [Specify the location of the core headers]),
