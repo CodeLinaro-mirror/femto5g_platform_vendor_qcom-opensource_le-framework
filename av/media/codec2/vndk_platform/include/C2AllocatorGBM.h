@@ -125,6 +125,8 @@ using LINKGbmBoImport = struct gbm_bo *(*)(struct gbm_device *gbm_dev,
         uint32_t type, void *buffer, uint32_t usage);
 using LINKGbmBoGetFd = int (*) (struct gbm_bo *bo);
 
+using ReleaseExtBufFunc = std::function<void(int32_t)>;
+
 #define DEFINE_FUNC_PTR_BY_SYM(sym)          \
         LINK##sym GbmLib::sFunc##sym;        \
 
@@ -170,6 +172,9 @@ typedef struct ExtraData {
     uint32_t id;
     uint32_t bo_lo;
     uint32_t bo_hi;
+    /* add a flag to indicate whether the external buffer should be released in the
+     * destructor, set it to 0 if the external buffer has been pushed downstream */
+    uint32_t need_free_ext_buf;
 } ExtraData;
 
 class C2HandleGBM : public C2Handle {
@@ -192,35 +197,8 @@ public:
 
 };
 
-class BufferEntryInfo {
-public:
-  BufferEntryInfo (bool used, uint64_t res_fmt_id, struct gbm_bo *bo, int32_t bo_fd, int32_t meta_fd, int32_t ext_fd);
-
-  bool used;
-  uint64_t res_fmt_id; // id contains resolution and pixel format
-  struct gbm_bo *bo;
-  int32_t bo_fd;
-  int32_t meta_fd;
-  int32_t ext_fd;
-  bool expired;
-};
-
-class BufferPool {
- public:
-    BufferPool();
-    c2_status_t acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, uint32_t width, uint32_t height, uint32_t format);
-    c2_status_t setMaxBufferCount(uint32_t size);
-    c2_status_t releaseBuffer(std::shared_ptr<BufferEntryInfo> entry);
-
-    std::list<std::shared_ptr<BufferEntryInfo> > mBufferList; // may include old and new buffer during port reconfig
-private:
-    uint32_t getBufferCountOfCurResFmt(); // get buffer count of current resolution and pixel format
-    uint64_t mCurResFmtId; // current id contain resolution and pixel format
-    uint32_t mMaxBufferCount; // means the max buffer count in pool for current sequence
-    uint32_t mExtBufferCount; // extend buffer count for time out
-    std::mutex mLock;   //  mutex for the buffer lists
-    std::condition_variable mEmptyCondition;
-};
+class BufferEntryInfo;
+class BufferPool;
 
 class C2AllocatorGBM : public C2Allocator {
 public:
@@ -239,6 +217,7 @@ public:
             std::shared_ptr<C2GraphicAllocation> *allocation) override;
 
     c2_status_t setMaxAllocationCount(uint32_t size);
+    uint32_t    getMaxAllocationCount(void);
 
     C2AllocatorGBM(id_t id);
 
@@ -255,6 +234,7 @@ public:
             uint32_t format, C2MemoryUsage usage);
     using AcquireExtBufFunc = std::function<void(uint32_t, uint32_t)>;
     c2_status_t setAcquireExtBufCb(const AcquireExtBufFunc cb);
+    c2_status_t setReleaseExtBufCb(const ReleaseExtBufFunc cb);
     c2_status_t acquireExtBuffer(uint32_t width, uint32_t height);
 
 private:
@@ -268,6 +248,7 @@ private:
     std::condition_variable mEmptyCondition;
     std::list<std::shared_ptr<BufferEntryInfo> > mExternalBufferList;
     AcquireExtBufFunc mAcquireExtBufFunc = nullptr;
+    ReleaseExtBufFunc mReleaseExtBufFunc = nullptr;
 };
 
 class C2AllocationGBM : public C2GraphicAllocation {
@@ -288,7 +269,8 @@ public:
     virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
 
     C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferPool> &pool, uint32_t width, uint32_t height,
-            uint32_t format, C2MemoryUsage usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle = nullptr);
+            uint32_t format, C2MemoryUsage usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle = nullptr,
+            ReleaseExtBufFunc releaseExtBufFunc = nullptr);
 
     c2_status_t status() const { return mRet; };
 
@@ -302,6 +284,7 @@ private:
     std::shared_ptr<BufferPool> mPool;
     C2Allocator::id_t mAllocatorId;
     c2_status_t mRet;
+    ReleaseExtBufFunc mReleaseExtBufFunc;
 };
 
 } // namespace android
