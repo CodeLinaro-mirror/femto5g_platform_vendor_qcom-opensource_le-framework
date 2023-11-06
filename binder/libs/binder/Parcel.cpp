@@ -123,7 +123,7 @@ void acquire_object(const sp<ProcessState>& proc,
             return;
         }
         case BINDER_TYPE_FD: {
-            if (obj.cookie != 0) {
+            if (PARCEL_COOKIE_ASHMEM == obj.cookie) {
                 if (outAshmemSize != NULL) {
                     // If we own an ashmem fd, keep track of how much memory it refers to.
                     int size = ashmem_get_size_region(obj.handle);
@@ -131,6 +131,9 @@ void acquire_object(const sp<ProcessState>& proc,
                         *outAshmemSize += size;
                     }
                 }
+            }
+            if (PARCEL_COOKIE_GBM_FD == obj.cookie) {
+                // do nothing as for now
             }
             return;
         }
@@ -175,8 +178,8 @@ static void release_object(const sp<ProcessState>& proc,
             return;
         }
         case BINDER_TYPE_FD: {
-            if (outAshmemSize != NULL) {
-                if (obj.cookie != 0) {
+            if (PARCEL_COOKIE_ASHMEM == obj.cookie) {
+                if (outAshmemSize != NULL) {
                     int size = ashmem_get_size_region(obj.handle);
                     if (size > 0) {
                         *outAshmemSize -= size;
@@ -184,6 +187,9 @@ static void release_object(const sp<ProcessState>& proc,
 
                     close(obj.handle);
                 }
+            }
+            if (PARCEL_COOKIE_GBM_FD == obj.cookie) {
+                close(obj.handle);
             }
             return;
         }
@@ -914,15 +920,30 @@ status_t Parcel::writeNativeHandle(const native_handle* handle)
     return err;
 }
 
-status_t Parcel::writeFileDescriptor(int fd, bool takeOwnership)
+status_t Parcel::_writeFileDescriptor(int fd, int cookie)
 {
     flat_binder_object obj;
     obj.hdr.type = BINDER_TYPE_FD;
     obj.flags = 0x7f | FLAT_BINDER_FLAG_ACCEPTS_FDS;
     obj.binder = 0; /* Don't pass uninitialized stack data to a remote process */
     obj.handle = fd;
-    obj.cookie = takeOwnership ? 1 : 0;
+    obj.cookie = cookie;
     return writeObject(obj, true);
+}
+
+status_t Parcel::writeFileDescriptor(int fd, bool takeOwnership)
+{
+    int cookie = takeOwnership ? PARCEL_COOKIE_ASHMEM : PARCEL_COOKIE_NONE;
+    return _writeFileDescriptor(fd, cookie);
+}
+
+status_t Parcel::writeFileDescriptor2(int fd, int cookie)
+{
+    if (-1 == fd) { /* Pass through the fd -1 to remote process */
+        return writeInt32(fd);
+    }
+
+    return _writeFileDescriptor(fd, cookie);
 }
 
 status_t Parcel::writeDupFileDescriptor(int fd)
@@ -1432,6 +1453,22 @@ int Parcel::readFileDescriptor() const
         }
     }
     return BAD_TYPE;
+}
+
+int Parcel::readFileDescriptor2() const
+{
+    int fd;
+    status_t err = readInt32(&fd);
+    if (err != NO_ERROR){
+        ALOGE("readInt32 error");
+        return BAD_TYPE;
+    }
+    if (-1 == fd) { // fd -1 has been passed through
+        return fd;
+    } else { // restore data pos to read fd
+        setDataPosition(dataPosition() - 4);
+        return readFileDescriptor();
+    }
 }
 
 status_t Parcel::readBlob(size_t len, ReadableBlob* outBlob) const

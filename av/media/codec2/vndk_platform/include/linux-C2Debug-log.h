@@ -160,9 +160,10 @@ class LogMessage {
 #define C2_DCHECK_NE
 
 enum DEBUG_LEVEL {
-  DEBUG_ERROR,
+  DEBUG_ERROR = 0,
   DEBUG_WARNING,
   DEBUG_INFO,
+  DEBUG_DEBUG,
   DEBUG_VERBOSE
 };
 
@@ -173,8 +174,8 @@ enum DEBUG_LEVEL {
 #define SYSLOG_ERROR()      LogMessage(__FILENAME__, __LINE__, DEBUG_ERROR)
 #define SYSLOG_WARNING()    LogMessage(__FILENAME__, __LINE__, DEBUG_WARNING)
 #define SYSLOG_INFO()       LogMessage(__FILENAME__, __LINE__, DEBUG_INFO)
+#define SYSLOG_DEBUG()      LogMessage(__FILENAME__, __LINE__, DEBUG_DEBUG)
 #define SYSLOG_VERBOSE()    LogMessage(__FILENAME__, __LINE__, DEBUG_VERBOSE)
-#define SYSLOG_DEBUG()      SYSLOG_VERBOSE()
 #define SYSLOG_FATAL()      SYSLOG_ERROR()
 #define SYSLOG(severity)    SYSLOG_ ## severity().stream()
 
@@ -184,6 +185,34 @@ class C2DebugLevel {
     public:
         C2DebugLevel();
 };
+
+
+/* undef Android log macros, use defines below instead. */
+#undef ALOGV
+#undef ALOGD
+#undef ALOGI
+#undef ALOGW
+#undef ALOGE
+
+#ifndef LOG_NDEBUG
+#define LOG_NDEBUG 1
+#endif
+
+extern void __c2_vndk_log(int level, const char *fmt, ...);
+
+#define __C2_LOG(level, format, args...) \
+    __c2_vndk_log(level, LOG_TAG ":%s:%d: " format "\n", __func__, __LINE__, ##args)
+
+/* C style debug logging macros for codec2 vndk. */
+#if LOG_NDEBUG
+#define ALOGV(fmt, args...)
+#else
+#define ALOGV(fmt, args...) __C2_LOG(DEBUG_VERBOSE, fmt, ##args)
+#endif
+#define ALOGD(fmt, args...) __C2_LOG(DEBUG_DEBUG, fmt, ##args)
+#define ALOGI(fmt, args...) __C2_LOG(DEBUG_INFO, fmt, ##args)
+#define ALOGW(fmt, args...) __C2_LOG(DEBUG_WARNING, fmt, ##args)
+#define ALOGE(fmt, args...) __C2_LOG(DEBUG_ERROR, fmt, ##args)
 
 #endif  // C2_HOST_DEBUG_LOG_H_
 
