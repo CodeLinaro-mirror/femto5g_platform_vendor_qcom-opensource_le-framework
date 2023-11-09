@@ -25,6 +25,8 @@
 #define LOG_TAG "ServiceManager"
 #include <cutils/log.h>
 #endif
+int selabel_lookup(struct selabel_handle *hnd, security_context_t *context, const char *key, int type);
+void selabel_close(struct selabel_handle *hnd);
 
 const char *str8(const uint16_t *x, size_t x_len)
 {
