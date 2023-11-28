@@ -240,8 +240,8 @@ bool DmaBufferPool::allocateBuffer(std::shared_ptr<C2DmaHandle> &handle,
         fd = mBufferAllocator->Alloc("system-secure", size, 0);
         buf_type = "secure";
     } else {
-        fd = mBufferAllocator->Alloc("qcom,system-uncached", size, 0);
-        buf_type = "non-secure";
+        fd = mBufferAllocator->Alloc("qcom,system", size, 0);
+        buf_type = "non-secure-cached";
     }
 
     if (fd < 0) {
