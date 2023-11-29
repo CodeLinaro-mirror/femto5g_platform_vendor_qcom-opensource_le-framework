@@ -71,6 +71,10 @@ enum {
                                 AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT |
                                 AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT |
                                 AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT |
+                                AUDIO_CHANNEL_OUT_WIDE_LEFT |
+                                AUDIO_CHANNEL_OUT_WIDE_RIGHT |
+                                AUDIO_CHANNEL_OUT_BACK_LEFT_OF_CENTER |
+                                AUDIO_CHANNEL_OUT_BACK_RIGHT_OF_CENTER |
                                 AUDIO_CHANNEL_OUT_HAPTIC_B |
                                 AUDIO_CHANNEL_OUT_HAPTIC_A,
 
