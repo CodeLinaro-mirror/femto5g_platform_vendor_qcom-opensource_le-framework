@@ -25,6 +25,8 @@
 #define LOG_TAG "ServiceManager"
 #include <cutils/log.h>
 #endif
+int selabel_lookup(struct selabel_handle *hnd, security_context_t *context, const char *key, int type);
+void selabel_close(struct selabel_handle *hnd);
 
 const char *str8(const uint16_t *x, size_t x_len)
 {
@@ -69,10 +71,10 @@ static bool check_mac_perms(pid_t spid, const char *tctx, const char *perm, cons
         ALOGE("SELinux: getpidcon(pid=%d) failed to retrieve pid context.\n", spid);
         return false;
     }
-
-    int result = selinux_check_access(sctx, tctx, class, perm, (void *) name);
-    allowed = (result == 0);
-
+    if(sctx != NULL){
+        int result = selinux_check_access(sctx, tctx, class, perm, (void *) name);
+        allowed = (result == 0);
+    }
     freecon(sctx);
     return allowed;
 }
