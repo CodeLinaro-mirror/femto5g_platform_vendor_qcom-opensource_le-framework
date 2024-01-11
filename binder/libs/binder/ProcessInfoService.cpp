@@ -39,7 +39,8 @@ status_t ProcessInfoService::getProcessStatesImpl(size_t length, /*in*/ int32_t*
         if (pis != NULL) {
             err = pis->getProcessStatesFromPids(length, /*in*/ pids, /*out*/ states);
             if (err == NO_ERROR) return NO_ERROR; // success
-            if (IInterface::asBinder(pis)->isBinderAlive()) return err;
+            sp<IBinder> binder = IInterface::asBinder(pis);
+            if (binder != NULL && binder->isBinderAlive()) return err;
         }
         sleep(1);
 
