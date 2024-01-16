@@ -94,6 +94,11 @@ public:
          * types.
          */
         PLATFORM_END,
+
+        /**
+         * ID of the GBM(Generic Buffer Management) backed platform allocator for graphic buffer.
+         */
+        GBM = VENDOR_START,
     };
 };
 

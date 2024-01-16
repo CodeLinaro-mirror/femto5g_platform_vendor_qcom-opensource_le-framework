@@ -30,16 +30,22 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "linux-C2Debug-log.h"
+
 #include <iostream>
 #include <sstream>
 #include <ostream>
 #include <vector>
 #include <syslog.h>
-#include "linux-C2Debug-log.h"
 #include <stdlib.h>
 
 uint32_t gC2VndkLogLevel = DEBUG_ERROR;
 static C2DebugLevel sC2DebugLevel;
+
+// enum DEBUG_LEVEL severity to syslog level
+static const int SEVERITY_TO_LEVEL[] = { LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_NOTICE, LOG_DEBUG };
+// corresponding definition is enum DEBUG_LEVEL
+static const char SEVERITY_TO_CHAR[] = { 'E', 'W', 'I', 'D', 'V' };
 
 C2DebugLevel::C2DebugLevel() {
   char debugLevel[32] = {0};
@@ -93,8 +99,6 @@ void LogMessage::Flush() {
 }
 
 void LogMessage::SendToSyslog() {
-  const int SEVERITY_TO_LEVEL[] = { LOG_ERR, LOG_WARNING, LOG_INFO, LOG_DEBUG };
-  const char SEVERITY_TO_CHAR[] = { 'E', 'W', 'I', 'V'}; // corresponding definition is enum DEBUG_LEVEL
   if (gC2VndkLogLevel >= severity_) {
     syslog(LOG_USER | SEVERITY_TO_LEVEL[severity_], "%c %s:%d] %.*s",
         SEVERITY_TO_CHAR[severity_], file_, line_,
@@ -126,4 +130,27 @@ LogMessage::LogMessageData::LogMessageData()
 
 std::ostream& LogMessage::stream() {
     return data_->stream_;
+}
+
+
+static inline void
+__c2_vndk_log_write(int severity, const char *fmt, va_list ap)
+{
+    char buf[1024];
+    int level = SEVERITY_TO_LEVEL[severity];
+    char s = SEVERITY_TO_CHAR[severity];
+
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    syslog(level, "%c %s", s, buf);
+}
+
+void __c2_vndk_log(int severity, const char *fmt, ...)
+{
+    if (severity > gC2VndkLogLevel)
+        return;
+
+    va_list ap;
+    va_start(ap, fmt);
+    __c2_vndk_log_write(severity, fmt, ap);
+    va_end(ap);
 }

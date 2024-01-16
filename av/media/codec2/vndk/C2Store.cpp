@@ -23,6 +23,7 @@
 
 #include <C2AllocatorGBM.h>
 #include <C2BlockInternal.h>
+#include <C2PlatformSupport.h>
 
 #ifdef _SUPPORT_DMABUF_
 #include <C2DmaLinearAllocator.h>
@@ -125,7 +126,7 @@ c2_status_t C2PlatformGraphicBlockPool::fetchGraphicBlock(
     if (allocatorGBM && allocatorGBM->isUseExternalBuffer()) {
         allocatorGBM->acquireExtBuffer(width, height);
         C2Handle *c2Handle = nullptr;
-        err = allocatorGBM->createC2HandleGBM(c2Handle, width, height, format, usage.expected);
+        err = allocatorGBM->createC2HandleOfExtBuf(c2Handle, width, height, format, usage);
         if (err == C2_OK) {
             err = mAllocator->priorGraphicAllocation(c2Handle, &alloc);
         }
@@ -193,41 +194,33 @@ C2PooledGraphicBlockPool::C2PooledGraphicBlockPool(
 C2PooledGraphicBlockPool::~C2PooledGraphicBlockPool() {
 }
 
-/* ===================================================== */
-/* Allocator Store */
-class C2PlatformAllocatorStore : public C2AllocatorStore {
+/**
+ * The platform allocator store provides basic allocator-types for the framework based on ION/dmabufheap/GBM.
+ * Allocators are not meant to be updatable.
+ */
+class C2PlatformAllocatorStoreImpl : public C2PlatformAllocatorStore {
 public:
-    typedef C2Allocator::id_t id_t;
+    C2PlatformAllocatorStoreImpl();
 
-    enum : C2Allocator::id_t {
-        DEFAULT_LINEAR,     ///< basic linear allocator type
-        DEFAULT_GRAPHIC,    ///< basic graphic allocator type
-        PLATFORM_START = 0x10,
-        VENDOR_START   = 0x100,
-        MMAP_LINEAR    = 0x1000,
-        MMAP_GRAPHIC   = 0x10000,
-        GBM_GRAPHIC    = 0x100000,
-        DMA_LINEAR     = 0x1000000,
-        BAD_ID         = C2Allocator::BAD_ID, ///< DO NOT USE
-    };
+    virtual c2_status_t fetchAllocator(
+            id_t id, std::shared_ptr<C2Allocator> *const allocator) override;
 
-    C2String getName() const override;
-    std::vector<std::shared_ptr<const C2Allocator::Traits>> listAllocators_nb() const override;
-    c2_status_t fetchAllocator(id_t id, std::shared_ptr<C2Allocator>* const allocator) override;
+    virtual std::vector<std::shared_ptr<const C2Allocator::Traits>> listAllocators_nb()
+            const override {
+        return std::vector<std::shared_ptr<const C2Allocator::Traits>>(); /// \todo
+    }
+
+    virtual C2String getName() const override {
+        return "android.allocator-store";
+    }
+
+    ~C2PlatformAllocatorStoreImpl() override = default;
 };
 
-C2String C2PlatformAllocatorStore::getName() const
-{
-    return "C2PlatformAllocatorStore";
+C2PlatformAllocatorStoreImpl::C2PlatformAllocatorStoreImpl() {
 }
 
-std::vector<std::shared_ptr<const C2Allocator::Traits>> C2PlatformAllocatorStore::listAllocators_nb() const
-{
-    std::vector<std::shared_ptr<const C2Allocator::Traits>> tr;
-    return tr;
-}
-
-c2_status_t C2PlatformAllocatorStore::fetchAllocator(id_t id, std::shared_ptr<C2Allocator>* const allocator)
+c2_status_t C2PlatformAllocatorStoreImpl::fetchAllocator(id_t id, std::shared_ptr<C2Allocator>* const allocator)
 {
     if (allocator == nullptr)
         return C2_NOT_FOUND;
@@ -235,14 +228,14 @@ c2_status_t C2PlatformAllocatorStore::fetchAllocator(id_t id, std::shared_ptr<C2
     switch (id) {
     case C2AllocatorStore::DEFAULT_LINEAR:
 #ifdef _SUPPORT_DMABUF_
-        *allocator = std::make_shared<C2DmaLinearAllocator>(C2PlatformAllocatorStore::DMA_LINEAR);
+        *allocator = std::make_shared<C2DmaLinearAllocator>(C2PlatformAllocatorStore::DMABUFHEAP);
 #else
-        *allocator = std::make_shared<C2AllocatorIon>(C2PlatformAllocatorStore::DEFAULT_LINEAR);
+        *allocator = std::make_shared<C2AllocatorIon>(C2AllocatorStore::DEFAULT_LINEAR);
 #endif
         break;
     case C2AllocatorStore::DEFAULT_GRAPHIC:
     default:
-        *allocator = std::make_shared<C2AllocatorGBM>(C2PlatformAllocatorStore::GBM_GRAPHIC);
+        *allocator = std::make_shared<C2AllocatorGBM>(C2PlatformAllocatorStore::GBM);
         break;
     }
     return C2_OK;
@@ -274,7 +267,7 @@ public:
             std::shared_ptr<const C2Component> component,
             C2BlockPool::local_id_t poolId,
             std::shared_ptr<C2BlockPool> *pool) {
-        std::shared_ptr<C2PlatformAllocatorStore> allocatorStore(new C2PlatformAllocatorStore);
+        std::shared_ptr<C2PlatformAllocatorStore> allocatorStore(new C2PlatformAllocatorStoreImpl);
         std::shared_ptr<C2Allocator> allocator;
         c2_status_t res = C2_NOT_FOUND;
 
@@ -408,7 +401,7 @@ c2_status_t GetCodec2BlockPool(
         std::shared_ptr<C2BlockPool> *pool) {
     pool->reset();
     std::lock_guard<std::mutex> lock(sBlockPoolCacheMutex);
-    std::shared_ptr<C2PlatformAllocatorStore> allocatorStore(new C2PlatformAllocatorStore);
+    std::shared_ptr<C2PlatformAllocatorStore> allocatorStore(new C2PlatformAllocatorStoreImpl);
     std::shared_ptr<C2Allocator> allocator;
     c2_status_t res = C2_NOT_FOUND;
 
@@ -452,7 +445,7 @@ c2_status_t GetCodec2BlockPoolWithAllocator(
         std::shared_ptr<C2BlockPool> *pool, std::shared_ptr<C2Allocator> *c2Allocator) {
     pool->reset();
     std::lock_guard<std::mutex> lock(sBlockPoolCacheMutex);
-    std::shared_ptr<C2PlatformAllocatorStore> allocatorStore(new C2PlatformAllocatorStore);
+    std::shared_ptr<C2PlatformAllocatorStore> allocatorStore(new C2PlatformAllocatorStoreImpl);
     std::shared_ptr<C2Allocator> allocator;
     c2_status_t res = C2_NOT_FOUND;
 

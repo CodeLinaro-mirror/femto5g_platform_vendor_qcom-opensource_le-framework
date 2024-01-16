@@ -33,6 +33,12 @@
 
 #define SIZE_T_MAX ULONG_MAX
 
+enum {
+    PARCEL_COOKIE_NONE   = 0, // not take ownership
+    PARCEL_COOKIE_ASHMEM = 1, // take ownership for leagcy ashmem
+    PARCEL_COOKIE_GBM_FD = 2, // take ownership for GBM fd
+};
+
 // ---------------------------------------------------------------------------
 namespace android {
 
@@ -130,12 +136,24 @@ public:
     // when this function returns). 
     // Doesn't take ownership of the native_handle.
     status_t            writeNativeHandle(const native_handle* handle);
-    
+
+private:
+    status_t            _writeFileDescriptor(int fd, int cookie);
+
+public:
     // Place a file descriptor into the parcel.  The given fd must remain
     // valid for the lifetime of the parcel.
     // The Parcel does not take ownership of the given fd unless you ask it to.
     status_t            writeFileDescriptor(int fd, bool takeOwnership = false);
-    
+
+    // Add this to write GBM fd into the parcel to avoid crash when calling
+    // ashmem_get_size_region() on GBM fd.  This shall pass through fd -1.
+    // This API may be extended in future for other type of memory fd.
+    // For parameter cookie, PARCEL_COOKIE_NONE means not taking ownership,
+    // while PARCEL_COOKIE_ASHMEM and PARCEL_COOKIE_GBM_FD take ownership of
+    // ashmem and GBM memory fd respectively.
+    status_t            writeFileDescriptor2(int fd, int cookie);
+
     // Place a file descriptor into the parcel.  A dup of the fd is made, which
     // will be closed once the parcel is destroyed.
     status_t            writeDupFileDescriptor(int fd);
@@ -211,6 +229,10 @@ public:
     // Retrieve a file descriptor from the parcel.  This returns the raw fd
     // in the parcel, which you do not own -- use dup() to get your own copy.
     int                 readFileDescriptor() const;
+
+    // Retrieve a file descriptor from the parcel.  Same as readFileDescriptor
+    // except this reads the fd -1 passed through firstly.
+    int                 readFileDescriptor2() const;
 
     // Reads a blob from the parcel.
     // The caller should call release() on the blob after reading its contents.
