@@ -555,7 +555,7 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
     } else {
         if (!mBufEntryInfo) {
             // clear the video private usage
-            gbmUsages &= ~(GBM_BO_PRIVATE_USAGE_NV12_512_QTI);
+            gbmUsages &= ~(GBM_BO_PRIVATE_USAGE_NV12_512_QTI | GBM_BO_PRIVATE_USAGE_C2D_OUTPUT_BUF);
             bo = GbmLib::sFuncGbmBoCreate(gbm, w, h, format, gbmUsages);
 
             if (bo == NULL) {
@@ -828,13 +828,13 @@ c2_status_t C2AllocatorGBM::attachExternalFd(int extFd)
     bool found = false;
 
     if (extFd <= 0) {
-        ALOGE("Invalid external buffer fd: %d", extFd);
+        ALOGE("Invalid external buffer fd: %d !", extFd);
         return C2_BAD_VALUE;
     }
 
     auto itr = mExternalBufferList.begin();
     while (itr != mExternalBufferList.end()) {
-        if ((*itr)->ext_fd == extFd) {
+        if ((*itr)->ext_fd == extFd && !(*itr)->expired) {
             (*itr)->used = false;
             found = true;
             break;
@@ -885,7 +885,7 @@ c2_status_t C2AllocatorGBM::createC2HandleOfExtBuf(C2Handle *&handle,
             bufData.format = format;
 
             // clear the video private usage
-            gbmUsages &= ~(GBM_BO_PRIVATE_USAGE_NV12_512_QTI);
+            gbmUsages &= ~(GBM_BO_PRIVATE_USAGE_NV12_512_QTI | GBM_BO_PRIVATE_USAGE_C2D_OUTPUT_BUF);
             gbmBo = GbmLib::sFuncGbmBoImport(mGBM, GBM_BO_IMPORT_FD, &bufData, gbmUsages);
             if (gbmBo) {
                 bo_fd = GbmLib::sFuncGbmBoGetFd(gbmBo);
@@ -945,7 +945,7 @@ c2_status_t C2AllocatorGBM::setReleaseExtBufCb(const ReleaseExtBufFunc cb)
     return C2_OK;
 }
 
-c2_status_t C2AllocatorGBM::acquireExtBuffer(uint32_t width, uint32_t height)
+c2_status_t C2AllocatorGBM::acquireExtBuffer(uint32_t width, uint32_t height, bool isC2D)
 {
     bool resolution_change = false;
     for (auto const& i: mExternalBufferList) {
@@ -956,7 +956,7 @@ c2_status_t C2AllocatorGBM::acquireExtBuffer(uint32_t width, uint32_t height)
     }
 
     if (mAcquireExtBufFunc) {
-        mAcquireExtBufFunc(width, height);
+        mAcquireExtBufFunc(width, height, isC2D);
     }
 
     if (resolution_change) {
