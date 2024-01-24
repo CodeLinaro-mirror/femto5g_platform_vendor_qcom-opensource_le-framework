@@ -161,12 +161,15 @@ status_t BpBinder::transact(
 {
     // Once a binder has died, it will never come back to life.
     if (mAlive) {
-        status_t status = IPCThreadState::self()->transact(
+	IPCThreadState* mePtr = IPCThreadState::self();
+        status_t status;
+        if (mePtr != NULL) {
+            status = mePtr->transact(
             mHandle, code, data, reply, flags);
+        }
         if (status == DEAD_OBJECT) mAlive = 0;
         return status;
     }
-
     return DEAD_OBJECT;
 }
 
