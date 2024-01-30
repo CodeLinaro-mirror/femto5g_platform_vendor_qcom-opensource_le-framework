@@ -25,6 +25,10 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
+
+#define ALOGE printf
+#define ALOGI printf
 
 #define OK              0
 #define ERROR           1
@@ -33,6 +37,8 @@
 
 #define ALIGN_TO(val, alignment) \
     (((uintptr_t)(val) + ((alignment) - 1)) & ~((alignment) - 1))
+
+static int8_t g_validate_camera_metadata = -1;
 
 /**
  * A single metadata entry, storing an array of values of a given type. If the
@@ -120,6 +126,49 @@ typedef union camera_metadata_data {
     camera_metadata_rational_t r;
 } camera_metadata_data_t;
 
+_Static_assert(sizeof(metadata_size_t) == 4,
+         "Size of metadata_size_t must be 4");
+_Static_assert(sizeof(metadata_uptrdiff_t) == 4,
+         "Size of metadata_uptrdiff_t must be 4");
+_Static_assert(sizeof(metadata_vendor_id_t) == 8,
+         "Size of metadata_vendor_id_t must be 8");
+_Static_assert(sizeof(camera_metadata_data_t) == 8,
+         "Size of camera_metadata_data_t must be 8");
+
+_Static_assert(offsetof(camera_metadata_buffer_entry_t, tag) == 0,
+         "Offset of tag must be 0");
+_Static_assert(offsetof(camera_metadata_buffer_entry_t, count) == 4,
+         "Offset of count must be 4");
+_Static_assert(offsetof(camera_metadata_buffer_entry_t, data) == 8,
+         "Offset of data must be 8");
+_Static_assert(offsetof(camera_metadata_buffer_entry_t, type) == 12,
+         "Offset of type must be 12");
+_Static_assert(sizeof(camera_metadata_buffer_entry_t) == 16,
+         "Size of camera_metadata_buffer_entry_t must be 16");
+
+_Static_assert(offsetof(camera_metadata_t, size) == 0,
+         "Offset of size must be 0");
+_Static_assert(offsetof(camera_metadata_t, version) == 4,
+         "Offset of version must be 4");
+_Static_assert(offsetof(camera_metadata_t, flags) == 8,
+         "Offset of flags must be 8");
+_Static_assert(offsetof(camera_metadata_t, entry_count) == 12,
+         "Offset of entry_count must be 12");
+_Static_assert(offsetof(camera_metadata_t, entry_capacity) == 16,
+         "Offset of entry_capacity must be 16");
+_Static_assert(offsetof(camera_metadata_t, entries_start) == 20,
+         "Offset of entries_start must be 20");
+_Static_assert(offsetof(camera_metadata_t, data_count) == 24,
+         "Offset of data_count must be 24");
+_Static_assert(offsetof(camera_metadata_t, data_capacity) == 28,
+         "Offset of data_capacity must be 28");
+_Static_assert(offsetof(camera_metadata_t, data_start) == 32,
+         "Offset of data_start must be 32");
+_Static_assert(offsetof(camera_metadata_t, vendor_id) == 40,
+         "Offset of vendor_id must be 40");
+_Static_assert(sizeof(camera_metadata_t) == 48,
+         "Size of camera_metadata_t must be 48");
+
 /**
  * The preferred alignment of a packet of camera metadata. In general,
  * this is the lowest common multiple of the constituents of a metadata
@@ -186,7 +235,7 @@ camera_metadata_t *allocate_copy_camera_metadata_checked(
 
     if (src_size < sizeof(camera_metadata_t)) {
         ALOGE("%s: Source size too small!", __FUNCTION__);
-        android_errorWriteLog(0x534e4554, "67782345");
+        // android_errorWriteLog(0x534e4554, "67782345");
         return NULL;
     }
 
@@ -227,7 +276,11 @@ camera_metadata_t *place_camera_metadata(void *dst,
 
     size_t memory_needed = calculate_camera_metadata_size(entry_capacity,
                                                           data_capacity);
-    if (memory_needed > dst_size) return NULL;
+    if (memory_needed > dst_size) {
+      ALOGE("%s: Memory needed to place camera metadata (%zu) > dst size (%zu)", __FUNCTION__,
+              memory_needed, dst_size);
+      return NULL;
+    }
 
     camera_metadata_t *metadata = (camera_metadata_t*)dst;
     metadata->version = CURRENT_METADATA_VERSION;
@@ -299,7 +352,11 @@ camera_metadata_t* copy_camera_metadata(void *dst, size_t dst_size,
     size_t memory_needed = get_camera_metadata_compact_size(src);
 
     if (dst == NULL) return NULL;
-    if (dst_size < memory_needed) return NULL;
+    if (dst_size < memory_needed) {
+        ALOGE("%s: Memory needed to place camera metadata (%zu) > dst size (%zu)", __FUNCTION__,
+                memory_needed, dst_size);
+      return NULL;
+    }
 
     camera_metadata_t *metadata =
         place_camera_metadata(dst, dst_size, src->entry_count, src->data_count);
@@ -327,7 +384,7 @@ static int validate_and_calculate_camera_metadata_entry_data_size(size_t *data_s
     // Check for overflow
     if (data_count != 0 &&
             camera_metadata_type_size[type] > (SIZE_MAX - DATA_ALIGNMENT + 1) / data_count) {
-        android_errorWriteLog(SN_EVENT_LOG_ID, "30741779");
+        // android_errorWriteLog(SN_EVENT_LOG_ID, "30741779");
         return ERROR;
     }
 
@@ -352,11 +409,21 @@ size_t calculate_camera_metadata_entry_data_size(uint8_t type,
 
 int validate_camera_metadata_structure(const camera_metadata_t *metadata,
                                        const size_t *expected_size) {
-
     if (metadata == NULL) {
         ALOGE("%s: metadata is null!", __FUNCTION__);
         return CAMERA_METADATA_VALIDATION_ERROR;
     }
+
+#if 0
+    if(g_validate_camera_metadata == -1) {
+        g_validate_camera_metadata = property_get_bool("persist.validate.camera.metadata", 0);
+        ALOGI("Camera metadata validation property persist.validate.camera.metadata set as %d", g_validate_camera_metadata);
+    }
+
+    if(g_validate_camera_metadata == 0) {
+        return OK;
+    }
+#endif
 
     uintptr_t aligned_ptr = ALIGN_TO(metadata, METADATA_PACKET_ALIGNMENT);
     const uintptr_t alignmentOffset = aligned_ptr - (uintptr_t) metadata;
@@ -382,14 +449,14 @@ int validate_camera_metadata_structure(const camera_metadata_t *metadata,
         };
 
         for (size_t i = 0; i < sizeof(alignments)/sizeof(alignments[0]); ++i) {
-            uintptr_t aligned_ptr = ALIGN_TO((uintptr_t) metadata + alignmentOffset,
+            uintptr_t aligned_ptr_section = ALIGN_TO((uintptr_t) metadata + alignmentOffset,
                     alignments[i].alignment);
 
-            if ((uintptr_t)metadata + alignmentOffset != aligned_ptr) {
+            if ((uintptr_t)metadata + alignmentOffset != aligned_ptr_section) {
                 ALOGE("%s: Metadata pointer is not aligned (actual %p, "
                       "expected %p, offset %" PRIuPTR ") to type %s",
                       __FUNCTION__, metadata,
-                      (void*)aligned_ptr, alignmentOffset, alignments[i].name);
+                      (void*)aligned_ptr_section, alignmentOffset, alignments[i].name);
                 return CAMERA_METADATA_VALIDATION_ERROR;
             }
         }
@@ -398,56 +465,71 @@ int validate_camera_metadata_structure(const camera_metadata_t *metadata,
     /**
      * Check that the metadata contents are correct
      */
-
-    if (expected_size != NULL && metadata->size > *expected_size) {
-        ALOGE("%s: Metadata size (%" PRIu32 ") should be <= expected size (%zu)",
-              __FUNCTION__, metadata->size, *expected_size);
+    if (expected_size != NULL && sizeof(camera_metadata_t) > *expected_size) {
+        ALOGE("%s: Metadata size (%zu) should be <= expected size (%zu)",
+                __FUNCTION__, sizeof(camera_metadata_t), *expected_size);
         return CAMERA_METADATA_VALIDATION_ERROR;
     }
 
-    if (metadata->entry_count > metadata->entry_capacity) {
+    // Create an aligned header
+    camera_metadata_t headerCopy;
+    const camera_metadata_t *header;
+    if (alignmentOffset != 0) {
+        memcpy(&headerCopy, metadata, sizeof(camera_metadata_t));
+        header = &headerCopy;
+    } else {
+        header = metadata;
+    }
+
+    if (expected_size != NULL && header->size > *expected_size) {
+        ALOGE("%s: Metadata size (%" PRIu32 ") should be <= expected size (%zu)",
+              __FUNCTION__, header->size, *expected_size);
+        return CAMERA_METADATA_VALIDATION_ERROR;
+    }
+
+    if (header->entry_count > header->entry_capacity) {
         ALOGE("%s: Entry count (%" PRIu32 ") should be <= entry capacity "
               "(%" PRIu32 ")",
-              __FUNCTION__, metadata->entry_count, metadata->entry_capacity);
+              __FUNCTION__, header->entry_count, header->entry_capacity);
         return CAMERA_METADATA_VALIDATION_ERROR;
     }
 
-    if (metadata->data_count > metadata->data_capacity) {
+    if (header->data_count > header->data_capacity) {
         ALOGE("%s: Data count (%" PRIu32 ") should be <= data capacity "
               "(%" PRIu32 ")",
-              __FUNCTION__, metadata->data_count, metadata->data_capacity);
-        android_errorWriteLog(SN_EVENT_LOG_ID, "30591838");
+              __FUNCTION__, header->data_count, header->data_capacity);
+        // android_errorWriteLog(SN_EVENT_LOG_ID, "30591838");
         return CAMERA_METADATA_VALIDATION_ERROR;
     }
 
     const metadata_uptrdiff_t entries_end =
-        metadata->entries_start + metadata->entry_capacity;
-    if (entries_end < metadata->entries_start || // overflow check
-        entries_end > metadata->data_start) {
+        header->entries_start + header->entry_capacity;
+    if (entries_end < header->entries_start || // overflow check
+        entries_end > header->data_start) {
 
         ALOGE("%s: Entry start + capacity (%" PRIu32 ") should be <= data start "
               "(%" PRIu32 ")",
                __FUNCTION__,
-              (metadata->entries_start + metadata->entry_capacity),
-              metadata->data_start);
+              (header->entries_start + header->entry_capacity),
+              header->data_start);
         return CAMERA_METADATA_VALIDATION_ERROR;
     }
 
     const metadata_uptrdiff_t data_end =
-        metadata->data_start + metadata->data_capacity;
-    if (data_end < metadata->data_start || // overflow check
-        data_end > metadata->size) {
+        header->data_start + header->data_capacity;
+    if (data_end < header->data_start || // overflow check
+        data_end > header->size) {
 
         ALOGE("%s: Data start + capacity (%" PRIu32 ") should be <= total size "
               "(%" PRIu32 ")",
                __FUNCTION__,
-              (metadata->data_start + metadata->data_capacity),
-              metadata->size);
+              (header->data_start + header->data_capacity),
+              header->size);
         return CAMERA_METADATA_VALIDATION_ERROR;
     }
 
     // Validate each entry
-    const metadata_size_t entry_count = metadata->entry_count;
+    const metadata_size_t entry_count = header->entry_count;
     camera_metadata_buffer_entry_t *entries = get_entries(metadata);
 
     for (size_t i = 0; i < entry_count; ++i) {
@@ -460,7 +542,12 @@ int validate_camera_metadata_structure(const camera_metadata_t *metadata,
             return CAMERA_METADATA_VALIDATION_ERROR;
         }
 
-        camera_metadata_buffer_entry_t entry = entries[i];
+        camera_metadata_buffer_entry_t entry;
+        if (alignmentOffset != 0) {
+            memcpy(&entry, entries + i, sizeof(camera_metadata_buffer_entry_t));
+        } else {
+            entry = entries[i];
+        }
 
         if (entry.type >= NUM_TYPES) {
             ALOGE("%s: Entry index %zu had a bad type %d",
@@ -471,7 +558,7 @@ int validate_camera_metadata_structure(const camera_metadata_t *metadata,
         // TODO: fix vendor_tag_ops across processes so we don't need to special
         //       case vendor-specific tags
         uint32_t tag_section = entry.tag >> 16;
-        int tag_type = get_local_camera_metadata_tag_type(entry.tag, metadata);
+        int tag_type = get_local_camera_metadata_tag_type(entry.tag, header);
         if (tag_type != (int)entry.type && tag_section < VENDOR_SECTION) {
             ALOGE("%s: Entry index %zu had tag type %d, but the type was %d",
                   __FUNCTION__, i, tag_type, entry.type);
@@ -952,6 +1039,15 @@ int get_local_camera_metadata_tag_type(uint32_t tag,
             meta->vendor_id;
 
     return get_local_camera_metadata_tag_type_vendor_id(tag, id);
+}
+
+const int32_t *get_camera_metadata_permission_needed(uint32_t *tag_count) {
+    if (NULL == tag_count) {
+        return NULL;
+    }
+
+    *tag_count = sizeof(tag_permission_needed) / sizeof(tag_permission_needed[0]);
+    return tag_permission_needed;
 }
 
 int set_camera_metadata_vendor_tag_ops(const vendor_tag_query_ops_t* ops) {
