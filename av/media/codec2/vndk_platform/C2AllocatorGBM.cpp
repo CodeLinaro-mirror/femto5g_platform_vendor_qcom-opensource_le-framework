@@ -554,6 +554,8 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
         ALOGW("acquire buffer time out");
     } else {
         if (!mBufEntryInfo) {
+            // clear the video private usage
+            gbmUsages &= ~(GBM_BO_PRIVATE_USAGE_NV12_512_QTI);
             bo = GbmLib::sFuncGbmBoCreate(gbm, w, h, format, gbmUsages);
 
             if (bo == NULL) {
@@ -882,6 +884,8 @@ c2_status_t C2AllocatorGBM::createC2HandleOfExtBuf(C2Handle *&handle,
             bufData.height = height;
             bufData.format = format;
 
+            // clear the video private usage
+            gbmUsages &= ~(GBM_BO_PRIVATE_USAGE_NV12_512_QTI);
             gbmBo = GbmLib::sFuncGbmBoImport(mGBM, GBM_BO_IMPORT_FD, &bufData, gbmUsages);
             if (gbmBo) {
                 bo_fd = GbmLib::sFuncGbmBoGetFd(gbmBo);

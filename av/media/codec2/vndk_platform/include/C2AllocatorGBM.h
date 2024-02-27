@@ -78,6 +78,7 @@
 #ifndef GBM_BO_USAGE_NV12_512_QTI
 #define GBM_BO_USAGE_NV12_512_QTI          0x40000000
 #endif
+#define GBM_BO_PRIVATE_USAGE_NV12_512_QTI  0x40000000
 
  // Linux platform buffer/memory usage bits.
  // The upper 32 bits is gbm usage. The lower 32 bits is C2 usage.
