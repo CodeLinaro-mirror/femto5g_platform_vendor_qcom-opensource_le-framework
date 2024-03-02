@@ -74,10 +74,8 @@
 #include <mutex>
 #include <condition_variable>
 
-// it's a workaround as gbm lib doesn't add such usage
-#ifndef GBM_BO_USAGE_NV12_512_QTI
-#define GBM_BO_USAGE_NV12_512_QTI          0x40000000
-#endif
+// workaround indicating whether this buffer is used for HEIC enc
+// this usage is video private usage, won't be transmitted into gbm API
 #define GBM_BO_PRIVATE_USAGE_NV12_512_QTI  0x40000000
 
  // Linux platform buffer/memory usage bits.
