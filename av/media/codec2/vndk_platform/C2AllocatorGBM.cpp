@@ -79,7 +79,8 @@ using namespace std::chrono_literals;
 
 #define DEFAULT_POOL_SIZE 6
 #define DEFAULT_EXTEND_POOL_SIZE 3
-#define WAIT_BUF_TIME 100ms
+#define MAX_WAIT_BUF_TIME 100ms
+#define BASE_WAIT_BUF_TIME 34ms
 #define INVALID_FD (-1)
 
 
@@ -227,17 +228,21 @@ public:
     BufferPool();
     c2_status_t acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, uint32_t width, uint32_t height, uint32_t format);
     c2_status_t setMaxBufferCount(uint32_t size);
-    uint32_t    getMaxBufferCount(void) { return mMaxBufferCount + DEFAULT_EXTEND_POOL_SIZE; }
+    uint32_t    getMaxBufferCount(void) { return mMaxBufferCount; }
     c2_status_t releaseBuffer(std::shared_ptr<BufferEntryInfo> entry);
 
     std::list<std::shared_ptr<BufferEntryInfo> > mBufferList; // may include old and new buffer during port reconfig
 private:
     uint32_t getBufferCountOfCurResFmt(); // get buffer count of current resolution and pixel format
     uint64_t mCurResFmtId; // current id contain resolution and pixel format
-    uint32_t mMaxBufferCount; // means the max buffer count in pool for current sequence
-    uint32_t mExtBufferCount; // extend buffer count for time out
-    std::mutex mLock;   //  mutex for the buffer lists
-    std::condition_variable mEmptyCondition;
+    uint32_t mMaxBufferCount; // max buffer count set by API setMaxBufferCount
+    uint32_t mExtBufferCount; // extended buffer count for time out
+    uint32_t mTotalBufferCount; // sum of max buffer count and extended buffer count
+    std::mutex mBufMutex;   //  mutex for the buffer lists
+    std::condition_variable mBufCond;
+    bool mBufSignaled; // avoid spurious wakeup
+    std::chrono::milliseconds mWaitTime = BASE_WAIT_BUF_TIME;
+    uint32_t mWaitTimeFactor = 1;
 };
 
 // Caller needs to free handle properly when handle is not used any more
@@ -300,16 +305,19 @@ BufferEntryInfo::BufferEntryInfo(bool used, uint64_t res_fmt_id,
 
 BufferPool::BufferPool()
     :mMaxBufferCount(DEFAULT_POOL_SIZE),
-    mExtBufferCount(0)
+    mExtBufferCount(0),
+    mTotalBufferCount(mMaxBufferCount + mExtBufferCount),
+    mBufSignaled(false)
 {
     GbmLib::loadGbm();
 }
 
 c2_status_t BufferPool::setMaxBufferCount(uint32_t size)
 {
-    std::lock_guard<std::mutex> listLock(mLock);
+    std::lock_guard<std::mutex> listLock(mBufMutex);
     mMaxBufferCount = size > DEFAULT_POOL_SIZE ? size : DEFAULT_POOL_SIZE;
     mExtBufferCount = 0;
+    mTotalBufferCount = mMaxBufferCount + mExtBufferCount;
     ALOGI("set max bufferCount of pool:%p: want:%d, result:%d, and reset extend buffer count",
         this, size, mMaxBufferCount);
 
@@ -333,7 +341,7 @@ uint32_t BufferPool::getBufferCountOfCurResFmt()
 
 c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, uint32_t width, uint32_t height, uint32_t format)
 {
-    std::unique_lock<std::mutex> listLock(mLock);
+    std::unique_lock<std::mutex> listLock(mBufMutex);
     auto itr = mBufferList.begin();
     uint64_t res_fmt_id = (uint64_t)format << 32 | width << 16 | height;
     c2_status_t ret = C2_OK;
@@ -359,11 +367,18 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, u
         mCurResFmtId = res_fmt_id;
     }
 
+    auto bufSignaledFunc = [&]() -> bool {
+        bool ret = mBufSignaled == true;
+        mBufSignaled = false;
+
+        return ret;
+    };
+
     while (!acquired) {
         itr = mBufferList.begin();
         // Need to allocate new bufer entry since the buffer
         // count is not more than the expected count.
-        if (getBufferCountOfCurResFmt() < mMaxBufferCount) {
+        if (getBufferCountOfCurResFmt() < mTotalBufferCount) {
             createNewEntry = true;
             ALOGI("need to create new entry, pool:%p", this);
             break;
@@ -382,17 +397,22 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, u
 
             if (itr == mBufferList.end()) {
                 ALOGD("waiting for buffer, pool:%p", this);
-                if (std::cv_status::timeout == mEmptyCondition.wait_for(listLock, WAIT_BUF_TIME)) {
-                    ALOGD("waiting for buffer time out, pool:%p", this);
+                if (!mBufCond.wait_for(listLock, mWaitTime, bufSignaledFunc)) {
+                    ALOGD("wait for buffer time out, wait time %d ms, pool:%p", mWaitTime.count(), this);
+                    if (mWaitTime < MAX_WAIT_BUF_TIME) {
+                        mWaitTime = std::min(++mWaitTimeFactor * BASE_WAIT_BUF_TIME, MAX_WAIT_BUF_TIME);
+                        ALOGD("increase wait time to %d ms", mWaitTime.count());
+                    }
                     // increase buffer count to make new entry possible
                     if (mExtBufferCount < DEFAULT_EXTEND_POOL_SIZE) {
-                        mMaxBufferCount++;
+                        mTotalBufferCount++;
                         mExtBufferCount++;
                         createNewEntry = true;
                         ALOGI("create a exteneded buf since time out");
                         break;
                     } else {
-                        ALOGW("Warning: wait idle buf timeout and extend buf cnt(%d) reach limit, pool:%p", mExtBufferCount, this);
+                        ALOGW("Warning: wait idle buf timeout and extend buf cnt(%d)"
+                                " reach limit, pool:%p", mExtBufferCount, this);
                         ret = C2_TIMED_OUT;
                         break;
                     }
@@ -420,9 +440,8 @@ c2_status_t BufferPool::releaseBuffer(std::shared_ptr<BufferEntryInfo> entry)
         ret = C2_BAD_VALUE;
     }
 
-    if (ret == C2_OK)
-    {
-        std::lock_guard<std::mutex> listLock(mLock);
+    if (ret == C2_OK) {
+        std::lock_guard<std::mutex> listLock(mBufMutex);
         auto itr = mBufferList.begin();
 
         _print_buf_entry_d("release", entry, this);
@@ -430,7 +449,7 @@ c2_status_t BufferPool::releaseBuffer(std::shared_ptr<BufferEntryInfo> entry)
             if ((*itr).get() == entry.get()) {
                 if (entry->res_fmt_id == mCurResFmtId) {
                     entry->used = false;
-                    if (getBufferCountOfCurResFmt() > mMaxBufferCount) {
+                    if (getBufferCountOfCurResFmt() > mTotalBufferCount) {
                         _print_buf_entry_i("decrease", *itr, this);
                         close_fd((*itr)->bo_fd);
                         GbmLib::sFuncGbmBoDestory((*itr)->bo);
@@ -459,7 +478,11 @@ c2_status_t BufferPool::releaseBuffer(std::shared_ptr<BufferEntryInfo> entry)
     }
 
     if (ret == C2_OK) {
-        mEmptyCondition.notify_one();
+        {
+            std::lock_guard<std::mutex> listLock(mBufMutex);
+            mBufSignaled = true;
+        }
+        mBufCond.notify_one();
         ALOGD("notify since one buffer released, pool:%p", this);
     }
 
