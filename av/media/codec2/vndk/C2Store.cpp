@@ -111,6 +111,7 @@ private:
     const std::shared_ptr<C2Allocator> mAllocator;
     local_id_t localId;
     C2Allocator::id_t allocatorId;
+    std::mutex mExtBufLock;
 };
 
 c2_status_t C2PlatformGraphicBlockPool::fetchGraphicBlock(
@@ -124,7 +125,10 @@ c2_status_t C2PlatformGraphicBlockPool::fetchGraphicBlock(
         std::dynamic_pointer_cast<android::C2AllocatorGBM>(mAllocator);
 
     if (allocatorGBM && allocatorGBM->isUseExternalBuffer()) {
-        allocatorGBM->acquireExtBuffer(width, height);
+        std::lock_guard<std::mutex> lock(mExtBufLock);
+        C2MemoryUsageGBM c2GbmUsage(usage);
+        bool isC2D = (c2GbmUsage.gbmUsage() & GBM_BO_PRIVATE_USAGE_C2D_OUTPUT_BUF);
+        allocatorGBM->acquireExtBuffer(width, height, isC2D);
         C2Handle *c2Handle = nullptr;
         err = allocatorGBM->createC2HandleOfExtBuf(c2Handle, width, height, format, usage);
         if (err == C2_OK) {
