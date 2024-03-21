@@ -914,21 +914,18 @@ c2_status_t C2AllocatorGBM::createC2HandleOfExtBuf(C2Handle *&handle,
                 bo_fd = GbmLib::sFuncGbmBoGetFd(gbmBo);
                 ALOGI("Newly imported gbm bo=%p fd=%d from ext_fd=%d", gbmBo, bo_fd, (*itr)->ext_fd);
                 if (bo_fd < 0) {
-                    ALOGE("Failed to get imported bo fd");
+                    ALOGE("Failed to get imported bo(%p, ext_fd %d)'s fd(%d)", gbmBo, (*itr)->ext_fd, bo_fd);
                     GbmLib::sFuncGbmBoDestory(gbmBo);
                     ret = C2_BAD_VALUE;
                 } else {
                     GbmLib::sFuncGbmPerform(GBM_PERFORM_GET_METADATA_ION_FD, gbmBo, &meta_fd);
                     if (meta_fd < 0) {
-                        ALOGE("Failed to get imported bo meta fd");
-                        close_fd(bo_fd);
-                        GbmLib::sFuncGbmBoDestory(gbmBo);
-                        ret = C2_BAD_VALUE;
-                    } else {
-                        (*itr)->bo = gbmBo;
-                        (*itr)->bo_fd = bo_fd;
-                        (*itr)->meta_fd = meta_fd;
+                        ALOGE("Failed to get imported bo(%p, bo_fd %d, ext_fd %d)'s meta fd(%d)",
+                            gbmBo, bo_fd, (*itr)->ext_fd, meta_fd);
                     }
+                    (*itr)->bo = gbmBo;
+                    (*itr)->bo_fd = bo_fd;
+                    (*itr)->meta_fd = meta_fd;
                 }
             } else {
                 ALOGE("Failed to import gbm bo for fd=%d", bufData.fd);
