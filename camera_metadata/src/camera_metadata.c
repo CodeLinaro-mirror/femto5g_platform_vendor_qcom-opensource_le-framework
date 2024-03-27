@@ -12,6 +12,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 #define _GNU_SOURCE // for fdprintf
 
@@ -34,6 +40,8 @@
 #define ERROR           1
 #define NOT_FOUND       (-ENOENT)
 #define SN_EVENT_LOG_ID 0x534e4554
+
+#define VALIDATE_CAMERA_METADATA 0
 
 #define ALIGN_TO(val, alignment) \
     (((uintptr_t)(val) + ((alignment) - 1)) & ~((alignment) - 1))
@@ -407,7 +415,7 @@ size_t calculate_camera_metadata_entry_data_size(uint8_t type,
 
 int validate_camera_metadata_structure(const camera_metadata_t *metadata,
                                        const size_t *expected_size) {
-
+#if VALIDATE_CAMERA_METADATA
     if (metadata == NULL) {
         ALOGE("%s: metadata is null!", __FUNCTION__);
         return CAMERA_METADATA_VALIDATION_ERROR;
@@ -580,6 +588,9 @@ int validate_camera_metadata_structure(const camera_metadata_t *metadata,
         return OK;
     }
     return CAMERA_METADATA_VALIDATION_SHIFTED;
+#else
+    return OK;
+#endif
 }
 
 int append_camera_metadata(camera_metadata_t *dst,
@@ -1029,6 +1040,98 @@ int set_camera_metadata_vendor_tag_ops(const vendor_tag_query_ops_t* ops) {
 int set_camera_metadata_vendor_ops(const vendor_tag_ops_t* ops) {
     vendor_tag_ops = ops;
     return OK;
+}
+
+void log_indented_camera_metadata(const camera_metadata_t* metadata)
+{
+    camera_metadata_buffer_entry_t* entry = NULL;
+    const char* tag_name = NULL,
+        * tag_section = NULL,
+        * type_name = "unknown";
+    unsigned int i;
+    size_t type_size = 0;
+    uint8_t* data_ptr = NULL;
+    uint8_t inc = 0;
+    if (metadata == NULL)
+    {
+        ALOGE("Logging camera metadata array: Not allocated\n");
+        return;
+    }
+    ALOGE("Logging camera metadata array: entry count : %ld entries | "
+          "entry_capacity : %ld | data count: %ld | data capacity %ld",
+          metadata->entry_count, metadata->entry_capacity,
+          metadata->data_count, metadata->data_capacity);
+
+    entry = get_entries(metadata);
+    if (entry == NULL)
+    {
+        ALOGE("Logging camera metadata : No Metadata entries available \n");
+        return;
+    }
+    for (i = 0; i < metadata->entry_count; i++, entry++)
+    {
+        tag_section = get_camera_metadata_section_name(entry->tag);
+        if (tag_section == NULL)
+        {
+            tag_section = "unknownSection";
+        }
+        tag_name = get_camera_metadata_tag_name(entry->tag);
+        if (tag_name == NULL)
+        {
+            tag_name = "unknownTag";
+        }
+        if (entry->type < NUM_TYPES)
+        {
+            type_name = camera_metadata_type_names[entry->type];
+        }
+        ALOGE("tag_section: %s, tag_name: %s,( entry->tag: %ld): type_name : %s[%ld]",
+            tag_section, tag_name,entry->tag, type_name, entry->count);
+
+        if (entry->type >= NUM_TYPES)
+        {
+            continue;
+        }
+        type_size = camera_metadata_type_size[entry->type];
+        if (type_size * entry->count > 4) {
+            if (entry->data.offset >= metadata->data_count) {
+                ALOGE("%s: Malformed entry data offset: %" PRIu32 " (max %" PRIu32 ")",
+                    __FUNCTION__,
+                    entry->data.offset,
+                    metadata->data_count);
+                continue;
+            }
+            data_ptr = get_data(metadata) + entry->data.offset;
+            ALOGE("data ptr count is smaller than 4");
+        }
+        else {
+            data_ptr = entry->data.value;
+            ALOGE("data ptr count is bigger than 4");
+        }
+
+        inc = camera_metadata_type_size[entry->type];
+        for (int k = 0; k < entry->count; k ++)
+        {
+            switch (entry->type) {
+                case TYPE_INT32:
+                    ALOGE("data[%d]: %ld", k, *(int32_t*)(data_ptr));
+                    break;
+                case TYPE_FLOAT:
+                    ALOGE("data[%d]: %0.8f ", k, *(float*)(data_ptr));
+                    break;
+                case TYPE_INT64:
+                    ALOGE("data[%d]: %llu", k, *(int64_t*)(data_ptr));
+                    break;
+                case TYPE_DOUBLE:
+                    ALOGE("data[%d]: %0.8f ", k, *(double*)(data_ptr));
+                    break;
+                case TYPE_BYTE:
+                default:
+                    ALOGE("data[%d]: %d ", k, *(data_ptr));
+                    break;
+            }
+            data_ptr += inc;
+        }
+    }
 }
 
 // Declared in system/media/private/camera/include/camera_metadata_hidden.h

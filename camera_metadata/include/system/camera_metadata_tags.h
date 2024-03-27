@@ -12,6 +12,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 /**
@@ -334,6 +340,7 @@ typedef enum camera_metadata_tag {
                                                       // int32        | hidden       | HIDL v3.6
     ANDROID_SCALER_MULTI_RESOLUTION_STREAM_SUPPORTED, // enum         | ndk_public   | HIDL v3.6
     ANDROID_SCALER_CROP_REGION_SET,                   // enum         | fwk_only
+    ANDROID_SCALER_AVAILABLE_PHYSICAL_STREAM_CHANNEL_CONFIGURATIONS,
     ANDROID_SCALER_END,
 
     ANDROID_SENSOR_EXPOSURE_TIME =                    // int64        | public       | HIDL v3.2
@@ -679,6 +686,8 @@ typedef enum camera_metadata_enum_android_control_scene_mode {
     ANDROID_CONTROL_SCENE_MODE_HDR                                  , // HIDL v3.2
     ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY_LOW_LIGHT              , // HIDL v3.2
     ANDROID_CONTROL_SCENE_MODE_DEVICE_CUSTOM_START                   = 100, // HIDL v3.2
+    ANDROID_CONTROL_SCENE_MODE_CV                                   , // HIDL v3.2
+    ANDROID_CONTROL_SCENE_MODE_HV                                   , // HIDL v3.2
     ANDROID_CONTROL_SCENE_MODE_DEVICE_CUSTOM_END                     = 127, // HIDL v3.2
 } camera_metadata_enum_android_control_scene_mode_t;
 
@@ -1265,5 +1274,3 @@ typedef enum camera_metadata_enum_android_usecase_template {
     ANDROID_USECASE_TEMPLATE_STATS_BG           = 0x1 << 4,  // HIDL unsupported
     ANDROID_USECASE_TEMPLATE_STATS_BHIST        = 0x1 << 5,  // HIDL unsupported
 } camera_metadata_enum_android_usecase_template_t;
-
-
