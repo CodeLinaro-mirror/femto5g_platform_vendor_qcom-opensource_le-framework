@@ -74,10 +74,11 @@
 #include <mutex>
 #include <condition_variable>
 
-// it's a workaround as gbm lib doesn't add such usage
-#ifndef GBM_BO_USAGE_NV12_512_QTI
-#define GBM_BO_USAGE_NV12_512_QTI          0x40000000
-#endif
+// workaround indicating whether this buffer is used for HEIC enc
+// this usage is video private usage, won't be transmitted into gbm API
+#define GBM_BO_PRIVATE_USAGE_NV12_512_QTI  0x40000000
+// workaround indicating whether this buffer is used for C2D output
+#define GBM_BO_PRIVATE_USAGE_C2D_OUTPUT_BUF  0x80000000
 
  // Linux platform buffer/memory usage bits.
  // The upper 32 bits is gbm usage. The lower 32 bits is C2 usage.
@@ -232,10 +233,13 @@ public:
     c2_status_t attachExternalFd(int extFd);
     c2_status_t createC2HandleOfExtBuf(C2Handle *&handle, uint32_t width, uint32_t height,
             uint32_t format, C2MemoryUsage usage);
-    using AcquireExtBufFunc = std::function<void(uint32_t, uint32_t)>;
+    using AcquireExtBufFunc = std::function<void(uint32_t, uint32_t, bool)>;
     c2_status_t setAcquireExtBufCb(const AcquireExtBufFunc cb);
     c2_status_t setReleaseExtBufCb(const ReleaseExtBufFunc cb);
-    c2_status_t acquireExtBuffer(uint32_t width, uint32_t height);
+    c2_status_t acquireExtBuffer(uint32_t width, uint32_t height, bool isC2D = false);
+
+    c2_status_t rebuildAllocationGBM(
+        C2Handle *handle, std::shared_ptr<C2GraphicAllocation> *allocation);
 
 private:
     c2_status_t mInit;
@@ -274,6 +278,7 @@ public:
 
     c2_status_t status() const { return mRet; };
 
+    void setRemote() {mIsFromRemote = true;}
 private:
     c2_status_t Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, C2MemoryUsage usage);
 
@@ -285,6 +290,7 @@ private:
     C2Allocator::id_t mAllocatorId;
     c2_status_t mRet;
     ReleaseExtBufFunc mReleaseExtBufFunc;
+    bool mIsFromRemote;
 };
 
 } // namespace android

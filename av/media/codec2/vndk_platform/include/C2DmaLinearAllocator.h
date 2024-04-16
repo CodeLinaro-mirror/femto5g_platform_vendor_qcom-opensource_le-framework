@@ -21,7 +21,11 @@
 #ifndef _CODEC2_DMA_LINEAR_ALLOCATOR_H_
 #define _CODEC2_DMA_LINEAR_ALLOCATOR_H_
 
+#ifdef _ENABLE_UMD_
+#include "plat_dmabuf.h"
+#else
 #include <BufferAllocator/BufferAllocator.h>
+#endif
 #include <C2Buffer.h>
 
 #include <map>
@@ -61,7 +65,11 @@ private:
 
     c2_status_t mInit;
 
+#ifdef _ENABLE_UMD_
+    int mDmaBuf_Fd;
+#else
     BufferAllocator mBufferAllocator;
+#endif
 
     std::shared_ptr<const Traits> mTraits;
 
