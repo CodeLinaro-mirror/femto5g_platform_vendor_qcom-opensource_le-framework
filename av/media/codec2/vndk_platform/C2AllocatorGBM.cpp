@@ -902,7 +902,7 @@ c2_status_t C2AllocatorGBM::attachExternalFd(int extFd)
 c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
         C2Handle *handle, std::shared_ptr<C2GraphicAllocation> *allocation)
 {
-    c2_status_t ret = C2_OK;
+    c2_status_t ret = C2_BAD_VALUE;
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t format = 0;
@@ -918,6 +918,10 @@ c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
 
     C2HandleGBM *gbmHandle = const_cast<C2HandleGBM*>(C2HandleGBM::Import(
         handle, &width, &height, &format, &usage, &stride, &size, &bo));
+    if (gbmHandle == nullptr) {
+        ALOGE("Failed to import C2HandleGBM for handle=%p", handle);
+        return ret;
+    }
     C2MemoryUsageGBM usages(usage);
 
     ALOGD("GBM handle: fd:%d meta_fd:%d ext_fd:%d width:%u height:%u "
@@ -938,7 +942,6 @@ c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
     gbmBo = GbmLib::sFuncGbmBoImport(mGBM, GBM_BO_IMPORT_GBM_BUF_TYPE, &buf_info, gbmUsages);
     if (gbmBo == nullptr) {
         ALOGE("Failed to import gbm bo for fd=%d meta fd=%d", buf_info.fd, buf_info.metadata_fd);
-        ret = C2_BAD_VALUE;
         return ret;
     }
 
@@ -946,17 +949,17 @@ c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
     gbmHandle->mInts.bo_hi = (uint32_t)(((uint64_t)gbmBo >> 32) & 0xFFFFFFFF);
     ALOGD("GBM imported bo:0x%" PRIx64, (uint64_t)gbmBo);
 
-    if (gbmHandle != nullptr) {
-        auto alloc = new C2AllocationGBM(mGBM, mPool, width, height, format, usages,
-                                         mTraits->id, gbmHandle);
+    auto alloc = new C2AllocationGBM(mGBM, mPool, width, height, format, usages,
+                                     mTraits->id, gbmHandle);
+    if (alloc == nullptr) {
+        ALOGE("Failed to new C2AllocationGBM");
+        return ret;
+    } else {
         alloc->setRemote();
         allocation->reset(alloc);
-    } else {
-        ret = C2_BAD_VALUE;
-        ALOGE("gbmHandle is NULL");
     }
 
-    return ret;
+    return C2_OK;
 }
 
 c2_status_t C2AllocatorGBM::createC2HandleOfExtBuf(C2Handle *&handle,
