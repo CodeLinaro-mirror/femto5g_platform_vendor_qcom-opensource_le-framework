@@ -689,7 +689,8 @@ C2AllocatorGBM::C2AllocatorGBM(id_t id)
     mDevice_fd = open("/dev/dri/renderD128", O_RDWR | O_CLOEXEC);
 
     if (mDevice_fd < 0) {
-        ALOGE("opening dri device for gbm failed");
+        int e = errno;
+        ALOGE("opening dri device for gbm failed, errno %d(%s)", e, strerror(e));
     } else {
         mGBM = GbmLib::sFuncGbmCreateDevice(mDevice_fd);
         if (mGBM == NULL) {
