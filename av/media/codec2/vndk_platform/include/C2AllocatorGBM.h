@@ -238,6 +238,9 @@ public:
     c2_status_t setReleaseExtBufCb(const ReleaseExtBufFunc cb);
     c2_status_t acquireExtBuffer(uint32_t width, uint32_t height, bool isC2D = false);
 
+    c2_status_t rebuildAllocationGBM(
+        C2Handle *handle, std::shared_ptr<C2GraphicAllocation> *allocation);
+
 private:
     c2_status_t mInit;
     std::shared_ptr<const Traits> mTraits;
@@ -275,6 +278,7 @@ public:
 
     c2_status_t status() const { return mRet; };
 
+    void setRemote() {mIsFromRemote = true;}
 private:
     c2_status_t Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, C2MemoryUsage usage);
 
@@ -286,6 +290,7 @@ private:
     C2Allocator::id_t mAllocatorId;
     c2_status_t mRet;
     ReleaseExtBufFunc mReleaseExtBufFunc;
+    bool mIsFromRemote;
 };
 
 } // namespace android
