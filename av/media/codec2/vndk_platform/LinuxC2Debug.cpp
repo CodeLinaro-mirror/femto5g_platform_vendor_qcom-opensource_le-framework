@@ -39,7 +39,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-uint32_t gC2VndkLogLevel = DEBUG_ERROR;
+uint32_t gC2VndkLogLevel = DEBUG_INFO;
 static C2DebugLevel sC2DebugLevel;
 
 // enum DEBUG_LEVEL severity to syslog level
