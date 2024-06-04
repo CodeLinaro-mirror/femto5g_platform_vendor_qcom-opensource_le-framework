@@ -598,8 +598,9 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
     } else {
         if (!mBufEntryInfo) {
             gbmUsages = getRealGBMUsage(c2GbmUsage);
+            ALOGI("GBM will create bo wxh:%ux%u format:0x%x usage:0x%x", w, h, format, gbmUsages);
             bo = GbmLib::sFuncGbmBoCreate(gbm, w, h, format, gbmUsages);
-            ALOGI("GBM bo wxh:%ux%u format:0x%x usage:0x%x", w, h, format, gbmUsages);
+            ALOGI("GBM bo wxh:%ux%u format:0x%x usage:0x%x, ret bo %p", w, h, format, gbmUsages, bo);
             if (bo == NULL) {
                 ALOGE("Failed to create GBM bo for format 0x%x, width-height:%dx%d, GBM usages:0x%x",
                         format, w, h, gbmUsages);
