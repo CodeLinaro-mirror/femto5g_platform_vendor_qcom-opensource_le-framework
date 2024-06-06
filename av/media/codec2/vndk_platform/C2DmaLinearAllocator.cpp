@@ -50,11 +50,19 @@ const C2Handle C2DmaHandle::cHeader = {
 /* ======================================= DMA Buffer Pool ====================================== */
 class DmaBufferPool {
 public:
+#ifdef _ENABLE_UMD_
+    explicit DmaBufferPool(int fd)
+        : mSweepedBufferCount(0), mMaxBufferSize(0),
+        mTotalBufferSize(0), mDmaBuf_Fd(fd) {
+        ALOGI("max pool buffer count %zu", kMaxPoolBufferCount);
+    }
+#else
     explicit DmaBufferPool(BufferAllocator *allocator)
         : mSweepedBufferCount(0), mMaxBufferSize(0),
         mTotalBufferSize(0), mBufferAllocator(allocator) {
         ALOGI("max pool buffer count %zu", kMaxPoolBufferCount);
     }
+#endif
     ~DmaBufferPool();
 
     c2_status_t acquireBuffer(std::shared_ptr<C2DmaHandle> &handle,
@@ -100,8 +108,11 @@ private:
     /* free buffers are in ascending order of buffer size as key. */
     std::multimap<size_t, std::shared_ptr<C2DmaHandle>> mFreeBuffers;
     std::list<std::shared_ptr<C2DmaHandle>> mUsedBuffers; /* for debugging */
+#ifdef _ENABLE_UMD_
+    int mDmaBuf_Fd;
+#else
     BufferAllocator* mBufferAllocator;
-
+#endif
     /* interlaced video output meta data buffer requirement is 37. */
     static constexpr size_t kMaxPoolBufferCount = 48; /* soft limit need to sweep buffer */
     /* to run smoothly, at least decoder needs 8 buffers and encoder needs 4 buffers. */
@@ -143,12 +154,19 @@ DmaBufferPool::~DmaBufferPool()
     std::list<std::shared_ptr<C2DmaHandle>> freeBuffers;
     for (const auto &p : mFreeBuffers) {
         freeBuffers.push_back(p.second);
+#ifdef _ENABLE_UMD_
+        dmabufheap_free(p.second->bufferFd());
+#endif
     }
     ALOGI("free %s", format(freeBuffers).c_str());
     freeBuffers.clear();
 
     /* buffer handle ref count gets to zero and buffers in pool are freed. */
     mFreeBuffers.clear();
+
+#ifdef _ENABLE_UMD_
+    dmabufheap_release(mDmaBuf_Fd);
+#endif
 }
 
 c2_status_t DmaBufferPool::acquireBuffer(std::shared_ptr<C2DmaHandle> &handle,
@@ -236,6 +254,16 @@ bool DmaBufferPool::allocateBuffer(std::shared_ptr<C2DmaHandle> &handle,
         goto out;
     }
 
+#ifdef _ENABLE_UMD_
+    if (usage.expected & C2MemoryUsage::READ_PROTECTED) {
+        // TODO: alloc from secure
+        dmabufheap_alloc(mDmaBuf_Fd, size, O_RDWR | O_CLOEXEC, &fd);
+        buf_type = "secure";
+    } else {
+        dmabufheap_alloc(mDmaBuf_Fd, size, O_RDWR | O_CLOEXEC, &fd);
+        buf_type = "non-secure-cached";
+    }
+#else
     if (usage.expected & C2MemoryUsage::READ_PROTECTED) {
         fd = mBufferAllocator->Alloc("system-secure", size, 0);
         buf_type = "secure";
@@ -243,6 +271,7 @@ bool DmaBufferPool::allocateBuffer(std::shared_ptr<C2DmaHandle> &handle,
         fd = mBufferAllocator->Alloc("qcom,system", size, 0);
         buf_type = "non-secure-cached";
     }
+#endif
 
     if (fd < 0) {
         ALOGE("failed to allocate %s buf size:%zu", buf_type, size);
@@ -483,7 +512,17 @@ c2_status_t C2DmaLinearAllocator::acquirePool(
         ALOGD("found pool of usage:0x%" PRIx64, key);
         pool = i->second;
     } else {
+#ifdef _ENABLE_UMD_
+        mDmaBuf_Fd = dmabufheap_init(ID_DMA_BUF_HEAP_CACHED);
+        if (mDmaBuf_Fd < 0) {
+            ALOGE("error: dmabufheap init failed");
+            ret = C2_NO_MEMORY;
+        } else {
+            pool = std::make_shared<DmaBufferPool>(mDmaBuf_Fd);
+        }
+#else
         pool = std::make_shared<DmaBufferPool>(&mBufferAllocator);
+#endif
         if (pool) {
             ALOGI("created pool of usage:0x%" PRIx64, key);
             mPools.insert({key, pool});

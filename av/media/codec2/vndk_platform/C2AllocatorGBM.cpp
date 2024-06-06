@@ -74,6 +74,7 @@
 #include <chrono>
 #include <cinttypes>
 #include <dlfcn.h>
+
 using namespace std::chrono_literals;
 
 
@@ -208,6 +209,13 @@ static inline uint32_t getBoRenderUsage(uint32_t format)
     }
 
     return gbmUsage;
+}
+
+/* Helper function to return real GBM usages after video private usages get cleared. */
+static inline uint32_t getRealGBMUsage(C2MemoryUsageGBM &usages) {
+    uint32_t gbmUsages = usages.gbmUsage();
+    gbmUsages &= ~(GBM_BO_PRIVATE_USAGE_NV12_512_QTI | GBM_BO_PRIVATE_USAGE_C2D_OUTPUT_BUF);
+    return gbmUsages;
 }
 
 class BufferEntryInfo {
@@ -531,7 +539,8 @@ C2AllocationGBM::C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferP
         uint32_t height, uint32_t format, C2MemoryUsage usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle,
         ReleaseExtBufFunc releaseExtBufFunc)
     : C2GraphicAllocation(width, height), mHandle(handle), mBufEntryInfo(nullptr), mBase(nullptr),
-    mMapSize(0), mPool(pool), mAllocatorId(allocatorId), mRet(C2_OK), mReleaseExtBufFunc(releaseExtBufFunc)
+    mMapSize(0), mPool(pool), mAllocatorId(allocatorId), mRet(C2_OK), mReleaseExtBufFunc(releaseExtBufFunc),
+    mIsFromRemote(false)
 {
     if (!gbm) {
         ALOGE("Invalid gbm device");
@@ -549,13 +558,23 @@ C2AllocationGBM::~C2AllocationGBM()
     if (mBufEntryInfo) {
         mPool->releaseBuffer(mBufEntryInfo);
     }
+
     if (mHandle) {
         if (mHandle->mFds.external_fd > 0 && mHandle->mInts.need_free_ext_buf) {
             if (mReleaseExtBufFunc) {
                 mReleaseExtBufFunc(mHandle->mFds.external_fd);
             }
         }
-        delete mHandle;
+        if (mIsFromRemote) {
+            uint64_t bo = mHandle->mInts.bo_lo | (uint64_t(mHandle->mInts.bo_hi) << 32);
+            GbmLib::sFuncGbmBoDestory ((struct gbm_bo *)bo);
+            native_handle_close(mHandle);
+            native_handle_delete(mHandle); // created in readC2Handle()
+            ALOGD("close remote fds");
+        } else {
+            delete mHandle;
+        }
+
         mHandle = nullptr;
     }
 }
@@ -570,6 +589,7 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
     C2MemoryUsageGBM c2GbmUsage(usage);
 
     gbmUsages = c2GbmUsage.gbmUsage() | getBoRenderUsage(format);
+    c2GbmUsage = C2MemoryUsageGBM(C2MemoryUsage(c2GbmUsage.c2Usage()), gbmUsages);
 
     ret = mPool->acquireBuffer(mBufEntryInfo, w, h, format);
 
@@ -577,10 +597,9 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
         ALOGW("acquire buffer time out");
     } else {
         if (!mBufEntryInfo) {
-            // clear the video private usage
-            gbmUsages &= ~(GBM_BO_PRIVATE_USAGE_NV12_512_QTI | GBM_BO_PRIVATE_USAGE_C2D_OUTPUT_BUF);
+            gbmUsages = getRealGBMUsage(c2GbmUsage);
             bo = GbmLib::sFuncGbmBoCreate(gbm, w, h, format, gbmUsages);
-
+            ALOGD("GBM bo wxh:%ux%u format:0x%x usage:0x%x", w, h, format, gbmUsages);
             if (bo == NULL) {
                 ALOGE("Failed to create GBM bo for format 0x%x, width-height:%dx%d, GBM usages:0x%x",
                         format, w, h, gbmUsages);
@@ -611,7 +630,9 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
 
         if (ret == C2_OK) {
             C2Handle* handle = nullptr;
-            ret = createC2HandleGBM(handle, mBufEntryInfo, usage.expected);
+            ALOGD("input usage:0x%" PRIx64 ", C2MemoryUsageGBM usage:0x%" PRIx64,
+                usage.expected, c2GbmUsage.expected);
+            ret = createC2HandleGBM(handle, mBufEntryInfo, c2GbmUsage.expected);
             if (ret == C2_OK) {
                 mHandle = static_cast<C2HandleGBM*>(handle);
             } else {
@@ -689,7 +710,8 @@ C2AllocatorGBM::C2AllocatorGBM(id_t id)
     mDevice_fd = open("/dev/dri/renderD128", O_RDWR | O_CLOEXEC);
 
     if (mDevice_fd < 0) {
-        ALOGE("opening dri device for gbm failed");
+        int e = errno;
+        ALOGE("opening dri device for gbm failed, errno %d(%s)", e, strerror(e));
     } else {
         mGBM = GbmLib::sFuncGbmCreateDevice(mDevice_fd);
         if (mGBM == NULL) {
@@ -875,6 +897,72 @@ c2_status_t C2AllocatorGBM::attachExternalFd(int extFd)
     return C2_OK;
 }
 
+// Rebuild C2AllocationGBM of GBM buffer from remote in C2 service & client for
+// decoding & encoding cases. In decoding case, service sends buffer to client
+// to rebuild allocation and unflat C2Buffer, and vice versa in encoding case.
+c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
+        C2Handle *handle, std::shared_ptr<C2GraphicAllocation> *allocation)
+{
+    c2_status_t ret = C2_BAD_VALUE;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t format = 0;
+    uint64_t usage = 0;
+    uint32_t stride = 0;
+    uint32_t size = 0;
+    uint64_t bo = 0;
+
+    if (mInit != C2_OK) {
+        ALOGE("GBM device is not created, unexpected");
+        return C2_NO_INIT;
+    }
+
+    C2HandleGBM *gbmHandle = const_cast<C2HandleGBM*>(C2HandleGBM::Import(
+        handle, &width, &height, &format, &usage, &stride, &size, &bo));
+    if (gbmHandle == nullptr) {
+        ALOGE("Failed to import C2HandleGBM for handle=%p", handle);
+        return ret;
+    }
+    C2MemoryUsageGBM usages(usage);
+
+    ALOGD("GBM handle: fd:%d meta_fd:%d ext_fd:%d width:%u height:%u "
+        "format:%x stride:%u slice_height:%u size:%u usage64:0x%" PRIx64 " bo:0x%" PRIx64,
+        gbmHandle->mFds.buffer_fd, gbmHandle->mFds.meta_buffer_fd, gbmHandle->mFds.external_fd,
+        width, height, format, stride, gbmHandle->mInts.slice_height, size, usage, bo);
+
+    struct gbm_buf_info buf_info;
+    buf_info.fd = handle->data[0];
+    buf_info.metadata_fd = handle->data[1];
+    buf_info.width = width;
+    buf_info.height = height;
+    buf_info.format = format;
+    buf_info.is_external_fd = 0;
+
+    struct gbm_bo *gbmBo;
+    uint32_t gbmUsages = getRealGBMUsage(usages);
+    gbmBo = GbmLib::sFuncGbmBoImport(mGBM, GBM_BO_IMPORT_GBM_BUF_TYPE, &buf_info, gbmUsages);
+    if (gbmBo == nullptr) {
+        ALOGE("Failed to import gbm bo for fd=%d meta fd=%d", buf_info.fd, buf_info.metadata_fd);
+        return ret;
+    }
+
+    gbmHandle->mInts.bo_lo = (uint32_t)((uint64_t)gbmBo & 0xFFFFFFFF);
+    gbmHandle->mInts.bo_hi = (uint32_t)(((uint64_t)gbmBo >> 32) & 0xFFFFFFFF);
+    ALOGD("GBM imported bo:0x%" PRIx64, (uint64_t)gbmBo);
+
+    auto alloc = new C2AllocationGBM(mGBM, mPool, width, height, format, usages,
+                                     mTraits->id, gbmHandle);
+    if (alloc == nullptr) {
+        ALOGE("Failed to new C2AllocationGBM");
+        return ret;
+    } else {
+        alloc->setRemote();
+        allocation->reset(alloc);
+    }
+
+    return C2_OK;
+}
+
 c2_status_t C2AllocatorGBM::createC2HandleOfExtBuf(C2Handle *&handle,
                               uint32_t width, uint32_t height,
                               uint32_t format, C2MemoryUsage usage)
@@ -907,28 +995,24 @@ c2_status_t C2AllocatorGBM::createC2HandleOfExtBuf(C2Handle *&handle,
             bufData.height = height;
             bufData.format = format;
 
-            // clear the video private usage
-            gbmUsages &= ~(GBM_BO_PRIVATE_USAGE_NV12_512_QTI | GBM_BO_PRIVATE_USAGE_C2D_OUTPUT_BUF);
+            gbmUsages = getRealGBMUsage(c2GbmUsage);
             gbmBo = GbmLib::sFuncGbmBoImport(mGBM, GBM_BO_IMPORT_FD, &bufData, gbmUsages);
             if (gbmBo) {
                 bo_fd = GbmLib::sFuncGbmBoGetFd(gbmBo);
                 ALOGI("Newly imported gbm bo=%p fd=%d from ext_fd=%d", gbmBo, bo_fd, (*itr)->ext_fd);
                 if (bo_fd < 0) {
-                    ALOGE("Failed to get imported bo fd");
+                    ALOGE("Failed to get imported bo(%p, ext_fd %d)'s fd(%d)", gbmBo, (*itr)->ext_fd, bo_fd);
                     GbmLib::sFuncGbmBoDestory(gbmBo);
                     ret = C2_BAD_VALUE;
                 } else {
                     GbmLib::sFuncGbmPerform(GBM_PERFORM_GET_METADATA_ION_FD, gbmBo, &meta_fd);
                     if (meta_fd < 0) {
-                        ALOGE("Failed to get imported bo meta fd");
-                        close_fd(bo_fd);
-                        GbmLib::sFuncGbmBoDestory(gbmBo);
-                        ret = C2_BAD_VALUE;
-                    } else {
-                        (*itr)->bo = gbmBo;
-                        (*itr)->bo_fd = bo_fd;
-                        (*itr)->meta_fd = meta_fd;
+                        ALOGE("Failed to get imported bo(%p, bo_fd %d, ext_fd %d)'s meta fd(%d)",
+                            gbmBo, bo_fd, (*itr)->ext_fd, meta_fd);
                     }
+                    (*itr)->bo = gbmBo;
+                    (*itr)->bo_fd = bo_fd;
+                    (*itr)->meta_fd = meta_fd;
                 }
             } else {
                 ALOGE("Failed to import gbm bo for fd=%d", bufData.fd);
