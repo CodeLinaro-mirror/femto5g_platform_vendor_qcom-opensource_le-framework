@@ -284,7 +284,7 @@ static c2_status_t createC2HandleGBM(C2Handle *&handle, std::shared_ptr<BufferEn
             handleGBM->mInts.bo_hi = (uint32_t)(((uint64_t)bo >> 32) & 0xFFFFFFFF);
             handleGBM->mInts.need_free_ext_buf = 1;
 
-            ALOGI("GBM handle data: fd:%d meta_fd:%d ext_fd:%d width:%u height:%u format:0x%x "
+            ALOGD("GBM handle data: fd:%d meta_fd:%d ext_fd:%d width:%u height:%u format:0x%x "
                     "C2&GBM usage_lo:0x%x usage_hi:0x%x stride:%u slice_height:%u size:%u, bo:0x%" PRIx64,
                     handleGBM->data[0], handleGBM->data[1], handleGBM->data[2], handleGBM->data[3],
                     handleGBM->data[4], handleGBM->data[5], handleGBM->data[6], handleGBM->data[7],
