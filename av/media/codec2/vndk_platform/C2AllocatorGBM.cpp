@@ -27,9 +27,9 @@
  */
 
 /*
- Changes from Qualcomm Innovation Center are provided under the following license:
+ Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
 
- Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted (subject to the limitations in the
@@ -220,7 +220,7 @@ static inline uint32_t getRealGBMUsage(C2MemoryUsageGBM &usages) {
 
 class BufferEntryInfo {
 public:
-    BufferEntryInfo (bool used, uint64_t res_fmt_id, struct gbm_bo *bo, int32_t bo_fd, int32_t meta_fd, int32_t ext_fd);
+    BufferEntryInfo (bool used, uint64_t res_fmt_id, struct gbm_bo *bo, int32_t bo_fd, int32_t meta_fd, int32_t ext_fd, int32_t idx);
 
     bool used;
     uint64_t res_fmt_id; // id contains resolution and pixel format
@@ -229,6 +229,7 @@ public:
     int32_t meta_fd;
     int32_t ext_fd;
     bool expired;
+    int32_t idx; // identify the external buf transfering through binder
 };
 
 class BufferPool {
@@ -283,6 +284,7 @@ static c2_status_t createC2HandleGBM(C2Handle *&handle, std::shared_ptr<BufferEn
             handleGBM->mInts.bo_lo = (uint32_t)((uint64_t)bo & 0xFFFFFFFF);
             handleGBM->mInts.bo_hi = (uint32_t)(((uint64_t)bo >> 32) & 0xFFFFFFFF);
             handleGBM->mInts.need_free_ext_buf = 1;
+            handleGBM->mInts.idx = entry->idx;
 
             ALOGD("GBM handle data: fd:%d meta_fd:%d ext_fd:%d width:%u height:%u format:0x%x "
                     "C2&GBM usage_lo:0x%x usage_hi:0x%x stride:%u slice_height:%u size:%u, bo:0x%" PRIx64,
@@ -305,8 +307,8 @@ static c2_status_t createC2HandleGBM(C2Handle *&handle, std::shared_ptr<BufferEn
 }
 
 BufferEntryInfo::BufferEntryInfo(bool used, uint64_t res_fmt_id,
-      struct gbm_bo * bo, int32_t bo_fd, int32_t meta_fd, int32_t ext_fd)
-    : used(used), res_fmt_id(res_fmt_id), bo(bo), bo_fd(bo_fd), meta_fd(meta_fd), ext_fd(ext_fd),
+      struct gbm_bo * bo, int32_t bo_fd, int32_t meta_fd, int32_t ext_fd, int32_t idx)
+    : used(used), res_fmt_id(res_fmt_id), bo(bo), bo_fd(bo_fd), meta_fd(meta_fd), ext_fd(ext_fd), idx(idx),
       expired(false)
 {
 }
@@ -537,10 +539,10 @@ const C2HandleGBM* C2HandleGBM::Import(
 
 C2AllocationGBM::C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferPool>& pool, uint32_t width,
         uint32_t height, uint32_t format, C2MemoryUsage usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle,
-        ReleaseExtBufFunc releaseExtBufFunc)
+        ReleaseExtBufFunc releaseExtBufFunc, std::shared_ptr<C2AllocatorGBM::ICallback> cb)
     : C2GraphicAllocation(width, height), mHandle(handle), mBufEntryInfo(nullptr), mBase(nullptr),
     mMapSize(0), mPool(pool), mAllocatorId(allocatorId), mRet(C2_OK), mReleaseExtBufFunc(releaseExtBufFunc),
-    mIsFromRemote(false)
+    mIsFromRemote(false), mCallback(cb)
 {
     if (!gbm) {
         ALOGE("Invalid gbm device");
@@ -560,8 +562,12 @@ C2AllocationGBM::~C2AllocationGBM()
     }
 
     if (mHandle) {
-        if (mHandle->mFds.external_fd > 0 && mHandle->mInts.need_free_ext_buf) {
-            if (mReleaseExtBufFunc) {
+        // only client side handles the ext buffer release
+        // service side will recycle the idx, and allocator will release the fds
+        if (mIsFromRemote && mHandle->mFds.external_fd > 0 && mHandle->mInts.need_free_ext_buf) {
+            if (mCallback) {
+                mCallback->onReleaseExtBuf(mHandle->mInts.idx);
+            } else if (mReleaseExtBufFunc) {
                 mReleaseExtBufFunc(mHandle->mFds.external_fd);
             }
         }
@@ -598,8 +604,9 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
     } else {
         if (!mBufEntryInfo) {
             gbmUsages = getRealGBMUsage(c2GbmUsage);
+            ALOGI("GBM will create bo wxh:%ux%u format:0x%x usage:0x%x", w, h, format, gbmUsages);
             bo = GbmLib::sFuncGbmBoCreate(gbm, w, h, format, gbmUsages);
-            ALOGD("GBM bo wxh:%ux%u format:0x%x usage:0x%x", w, h, format, gbmUsages);
+            ALOGI("GBM bo wxh:%ux%u format:0x%x usage:0x%x, ret bo %p", w, h, format, gbmUsages, bo);
             if (bo == NULL) {
                 ALOGE("Failed to create GBM bo for format 0x%x, width-height:%dx%d, GBM usages:0x%x",
                         format, w, h, gbmUsages);
@@ -619,7 +626,7 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
                         GbmLib::sFuncGbmBoDestory(bo);
                         ret = C2_BAD_VALUE;
                     } else {
-                        mBufEntryInfo = std::make_shared<BufferEntryInfo>(true, res_fmt_id, bo, bo_fd, meta_fd, INVALID_FD);
+                        mBufEntryInfo = std::make_shared<BufferEntryInfo>(true, res_fmt_id, bo, bo_fd, meta_fd, INVALID_FD, -1);
                         _print_buf_entry_i("new", mBufEntryInfo, mPool.get());
                         // add new entry to buffer list
                         mPool->releaseBuffer(mBufEntryInfo);
@@ -708,9 +715,10 @@ C2AllocatorGBM::C2AllocatorGBM(id_t id)
     mTraits = std::make_shared<Traits>(traits);
 
     mDevice_fd = open("/dev/dri/renderD128", O_RDWR | O_CLOEXEC);
-
+    ALOGI("C2AllocatorGBM constructor(%u) open gbm dev node, ret fd %d", (unsigned int)id, mDevice_fd);
     if (mDevice_fd < 0) {
-        ALOGE("opening dri device for gbm failed");
+        int e = errno;
+        ALOGE("opening dri device for gbm failed, errno %d(%s)", e, strerror(e));
     } else {
         mGBM = GbmLib::sFuncGbmCreateDevice(mDevice_fd);
         if (mGBM == NULL) {
@@ -737,6 +745,10 @@ C2AllocatorGBM::~C2AllocatorGBM()
     for (auto const& i: mExternalBufferList) {
         if (i->bo) {
             close_fd(i->bo_fd);
+#ifdef USE_AGL_C2SERVICE
+            // In non-c2service scenario, ext_fd is closed by the owner of ext buf
+            close_fd(i->ext_fd);
+#endif
             GbmLib::sFuncGbmBoDestory (i->bo);
             _print_buf_entry_i("ext gbm finalize", i, nullptr);
         }
@@ -744,11 +756,13 @@ C2AllocatorGBM::~C2AllocatorGBM()
     mExternalBufferList.clear();
 
     if (mGBM) {
+        ALOGI("Destroy gbm device: %p", mGBM);
         GbmLib::sFuncGbmDeviceDestroy(mGBM);
         mGBM = NULL;
     }
 
     if (mDevice_fd > 0) {
+        ALOGI("C2AllocatorGBM destructor close gbm dev node fd %d", mDevice_fd);
         close(mDevice_fd);
         mDevice_fd = INVALID_FD;
     }
@@ -825,7 +839,7 @@ c2_status_t C2AllocatorGBM::priorGraphicAllocation(
 
     if (gbmHandle != nullptr) {
         allocation->reset(new C2AllocationGBM(mGBM, mPool, width, height, format, usages,
-                                              mTraits->id, gbmHandle, mReleaseExtBufFunc));
+                                              mTraits->id, gbmHandle, mReleaseExtBufFunc, mCallback));
     } else {
         ret = C2_BAD_VALUE;
         ALOGE("gbmHandle is NULL");
@@ -867,8 +881,16 @@ bool C2AllocatorGBM::isUseExternalBuffer()
     return mUseExternalBuffer;
 }
 
-c2_status_t C2AllocatorGBM::attachExternalFd(int extFd)
+c2_status_t C2AllocatorGBM::attachExternalFd(int extFd) {
+    return attachExternalFd(extFd, extFd);
+}
+
+c2_status_t C2AllocatorGBM::attachExternalFd(int extFd, int idx)
 {
+#ifdef USE_AGL_C2SERVICE
+    std::lock_guard<std::mutex> lk(mExtBufLock);
+#endif
+
     bool found = false;
 
     if (extFd <= 0) {
@@ -878,9 +900,17 @@ c2_status_t C2AllocatorGBM::attachExternalFd(int extFd)
 
     auto itr = mExternalBufferList.begin();
     while (itr != mExternalBufferList.end()) {
+#ifndef USE_AGL_C2SERVICE
         if ((*itr)->ext_fd == extFd && !(*itr)->expired) {
+#else
+        if ((*itr)->idx == idx && !(*itr)->expired) {
+#endif
             (*itr)->used = false;
             found = true;
+#ifdef USE_AGL_C2SERVICE
+            // close the extFd, use the cached fd instead
+            close(extFd);
+#endif
             break;
         } else {
             ++itr;
@@ -888,7 +918,7 @@ c2_status_t C2AllocatorGBM::attachExternalFd(int extFd)
     }
     if (!found) {
         std::shared_ptr<BufferEntryInfo> buffer =
-            std::make_shared<BufferEntryInfo>(false, 0, nullptr, INVALID_FD, INVALID_FD, extFd);
+            std::make_shared<BufferEntryInfo>(false, 0, nullptr, INVALID_FD, INVALID_FD, extFd, idx);
         mExternalBufferList.push_back(buffer);
         ALOGD("Add new external entry to buffer list with external fd=%d", extFd);
     }
@@ -902,7 +932,7 @@ c2_status_t C2AllocatorGBM::attachExternalFd(int extFd)
 c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
         C2Handle *handle, std::shared_ptr<C2GraphicAllocation> *allocation)
 {
-    c2_status_t ret = C2_OK;
+    c2_status_t ret = C2_BAD_VALUE;
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t format = 0;
@@ -918,6 +948,10 @@ c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
 
     C2HandleGBM *gbmHandle = const_cast<C2HandleGBM*>(C2HandleGBM::Import(
         handle, &width, &height, &format, &usage, &stride, &size, &bo));
+    if (gbmHandle == nullptr) {
+        ALOGE("Failed to import C2HandleGBM for handle=%p", handle);
+        return ret;
+    }
     C2MemoryUsageGBM usages(usage);
 
     ALOGD("GBM handle: fd:%d meta_fd:%d ext_fd:%d width:%u height:%u "
@@ -938,7 +972,6 @@ c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
     gbmBo = GbmLib::sFuncGbmBoImport(mGBM, GBM_BO_IMPORT_GBM_BUF_TYPE, &buf_info, gbmUsages);
     if (gbmBo == nullptr) {
         ALOGE("Failed to import gbm bo for fd=%d meta fd=%d", buf_info.fd, buf_info.metadata_fd);
-        ret = C2_BAD_VALUE;
         return ret;
     }
 
@@ -946,17 +979,26 @@ c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
     gbmHandle->mInts.bo_hi = (uint32_t)(((uint64_t)gbmBo >> 32) & 0xFFFFFFFF);
     ALOGD("GBM imported bo:0x%" PRIx64, (uint64_t)gbmBo);
 
-    if (gbmHandle != nullptr) {
-        auto alloc = new C2AllocationGBM(mGBM, mPool, width, height, format, usages,
-                                         mTraits->id, gbmHandle);
+    auto alloc = new C2AllocationGBM(mGBM, mPool, width, height, format, usages,
+                                     mTraits->id, gbmHandle);
+    if (alloc == nullptr) {
+        ALOGE("Failed to new C2AllocationGBM");
+        return ret;
+    } else {
         alloc->setRemote();
         allocation->reset(alloc);
-    } else {
-        ret = C2_BAD_VALUE;
-        ALOGE("gbmHandle is NULL");
     }
 
-    return ret;
+    return C2_OK;
+}
+
+
+c2_status_t C2AllocatorGBM::setCallback(std::shared_ptr<ICallback> cb)
+{
+    ALOGI("%s mUseExternalBuffer:%s", __func__, mUseExternalBuffer ? "YES" : "NO");
+    mCallback = cb;
+
+    return C2_OK;
 }
 
 c2_status_t C2AllocatorGBM::createC2HandleOfExtBuf(C2Handle *&handle,
@@ -995,23 +1037,29 @@ c2_status_t C2AllocatorGBM::createC2HandleOfExtBuf(C2Handle *&handle,
             gbmBo = GbmLib::sFuncGbmBoImport(mGBM, GBM_BO_IMPORT_FD, &bufData, gbmUsages);
             if (gbmBo) {
                 bo_fd = GbmLib::sFuncGbmBoGetFd(gbmBo);
-                ALOGI("Newly imported gbm bo=%p fd=%d from ext_fd=%d", gbmBo, bo_fd, (*itr)->ext_fd);
+                ALOGI("Newly imported gbm bo=%p bo_fd=%d from ext_fd=%d, idx=%d", gbmBo, bo_fd, (*itr)->ext_fd, (*itr)->idx);
                 if (bo_fd < 0) {
                     ALOGE("Failed to get imported bo(%p, ext_fd %d)'s fd(%d)", gbmBo, (*itr)->ext_fd, bo_fd);
                     GbmLib::sFuncGbmBoDestory(gbmBo);
                     ret = C2_BAD_VALUE;
                 } else {
-                    GbmLib::sFuncGbmPerform(GBM_PERFORM_GET_METADATA_ION_FD, gbmBo, &meta_fd);
-                    if (meta_fd < 0) {
-                        ALOGE("Failed to get imported bo(%p, bo_fd %d, ext_fd %d)'s meta fd(%d)",
-                            gbmBo, bo_fd, (*itr)->ext_fd, meta_fd);
+                    if (mCallback) { // ext-buf + c2service senario
+                        (*itr)->bo = gbmBo;
+                        (*itr)->bo_fd = bo_fd;
+                        (*itr)->meta_fd = meta_fd;
+                    } else {
+                        GbmLib::sFuncGbmPerform(GBM_PERFORM_GET_METADATA_ION_FD, gbmBo, &meta_fd);
+                        if (meta_fd < 0) {
+                            ALOGE("Failed to get imported bo(%p, bo_fd %d, ext_fd %d)'s meta fd(%d)",
+                                gbmBo, bo_fd, (*itr)->ext_fd, meta_fd);
+                        }
+                        (*itr)->bo = gbmBo;
+                        (*itr)->bo_fd = bo_fd;
+                        (*itr)->meta_fd = meta_fd;
                     }
-                    (*itr)->bo = gbmBo;
-                    (*itr)->bo_fd = bo_fd;
-                    (*itr)->meta_fd = meta_fd;
                 }
             } else {
-                ALOGE("Failed to import gbm bo for fd=%d", bufData.fd);
+                ALOGE("Failed to import gbm bo for bufData.fd=%d ext_fd=%d, idx=%d", bufData.fd, (*itr)->ext_fd, (*itr)->idx);
                 ret = C2_BAD_VALUE;
             }
         } else {
@@ -1058,7 +1106,9 @@ c2_status_t C2AllocatorGBM::acquireExtBuffer(uint32_t width, uint32_t height, bo
         }
     }
 
-    if (mAcquireExtBufFunc) {
+    if (mCallback) {
+        mCallback->onAcquireExtBuf(width, height, isC2D);
+    } else if (mAcquireExtBufFunc) {
         mAcquireExtBufFunc(width, height, isC2D);
     }
 
@@ -1070,6 +1120,9 @@ c2_status_t C2AllocatorGBM::acquireExtBuffer(uint32_t width, uint32_t height, bo
                 close_fd((*itr)->bo_fd);
                 GbmLib::sFuncGbmBoDestory((*itr)->bo);
                 (*itr)->bo = nullptr;
+#ifdef USE_AGL_C2SERVICE
+                close_fd((*itr)->ext_fd);
+#endif
                 itr = mExternalBufferList.erase(itr);
             } else {
                 ++itr;
