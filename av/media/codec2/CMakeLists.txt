@@ -14,6 +14,7 @@ set(AGL_LINUX OFF CACHE BOOL "AGL(Automotive Grade Linux): ON|OFF. Default [OFF]
 set(SUPPORT_DMABUF_HEAP OFF CACHE BOOL "Support DMA buffer heap: ON|OFF. Default [OFF]")
 set(LOAD_CORE_LIB OFF CACHE BOOL "Load core library: ON|OFF. Default [OFF]")
 set(ENABLE_UMD OFF CACHE BOOL ": Enable libkiumd dependency instead libdmabufheap ON|OFF. Default [OFF]")
+set(USE_AGL_C2SERVICE OFF CACHE BOOL "Enable AGL C2Service: ON|OFF. Default [OFF]")
 
 if(AGL_LINUX)
     add_definitions(-D_AGL_LINUX_)
@@ -29,6 +30,10 @@ endif()
 
 if(LOAD_CORE_LIB)
     add_definitions(-D_LOAD_CORE_LIB_)
+endif()
+
+if(USE_AGL_C2SERVICE)
+    add_definitions(-DUSE_AGL_C2SERVICE)
 endif()
 
 # Build debug version
