@@ -291,7 +291,14 @@ public:
 
     c2_status_t status() const { return mRet; };
 
-    void setRemote() {mIsFromRemote = true;}
+    void fromRemote() {
+        mIsFromRemote = true;
+        mIsToRemote = false;
+    }
+    void toRemote() {
+        mIsToRemote = true;
+        mIsFromRemote = false;
+    }
 private:
     c2_status_t Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, C2MemoryUsage usage);
 
@@ -304,6 +311,7 @@ private:
     c2_status_t mRet;
     ReleaseExtBufFunc mReleaseExtBufFunc;
     bool mIsFromRemote;
+    bool mIsToRemote;
     std::shared_ptr<C2AllocatorGBM::ICallback> mCallback;
 };
 
