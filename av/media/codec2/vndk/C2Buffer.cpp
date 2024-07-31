@@ -621,6 +621,13 @@ std::shared_ptr<C2GraphicBlock> _C2BlockFactory::CreateGraphicBlock(
     }
 }
 
+std::shared_ptr<C2GraphicAllocation>
+_C2BlockFactory::GetGraphicBlockAllocation(const C2Block2D &block) {
+    if (block.mImpl) {
+        return block.mImpl->getAllocation();
+    }
+    return nullptr;
+}
 
 /* ========================================== BUFFER ========================================= */
 

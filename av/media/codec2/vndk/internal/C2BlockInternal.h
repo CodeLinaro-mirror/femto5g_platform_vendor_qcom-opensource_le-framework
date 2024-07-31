@@ -261,6 +261,18 @@ struct _C2BlockFactory {
     static
     bool BeginAttachBlockToBufferQueue(
             const std::shared_ptr<_C2BlockPoolData>& poolData);
+
+
+     /**
+      * Get allocation from the blockpool data.
+      *
+      * \param shared pointer to the 2D block which is already created.
+      *
+      * \return allocation hold by the block
+      */
+    static
+    std::shared_ptr<C2GraphicAllocation>
+    GetGraphicBlockAllocation(const C2Block2D &block);
 };
 
 #endif // ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
