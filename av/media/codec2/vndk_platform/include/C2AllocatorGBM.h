@@ -27,9 +27,9 @@
  */
 
 /*
- Changes from Qualcomm Innovation Center are provided under the following license:
+ Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
 
- Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted (subject to the limitations in the
@@ -176,6 +176,8 @@ typedef struct ExtraData {
     /* add a flag to indicate whether the external buffer should be released in the
      * destructor, set it to 0 if the external buffer has been pushed downstream */
     uint32_t need_free_ext_buf;
+    // idx identifies the external buf transfering through binder
+    int32_t  idx;
 } ExtraData;
 
 class C2HandleGBM : public C2Handle {
@@ -231,6 +233,7 @@ public:
     bool isUseExternalBuffer();
     c2_status_t setUseExternalBuffer(bool useExternal);
     c2_status_t attachExternalFd(int extFd);
+    c2_status_t attachExternalFd(int extFd, int idx);
     c2_status_t createC2HandleOfExtBuf(C2Handle *&handle, uint32_t width, uint32_t height,
             uint32_t format, C2MemoryUsage usage);
     using AcquireExtBufFunc = std::function<void(uint32_t, uint32_t, bool)>;
@@ -240,6 +243,13 @@ public:
 
     c2_status_t rebuildAllocationGBM(
         C2Handle *handle, std::shared_ptr<C2GraphicAllocation> *allocation);
+
+    struct ICallback {
+        virtual void onAcquireExtBuf(uint32_t w, uint32_t h, bool isC2D = false) = 0;
+        virtual void onReleaseExtBuf(int fd) = 0;
+    };
+
+    c2_status_t setCallback(std::shared_ptr<ICallback> cb);
 
 private:
     c2_status_t mInit;
@@ -253,6 +263,9 @@ private:
     std::list<std::shared_ptr<BufferEntryInfo> > mExternalBufferList;
     AcquireExtBufFunc mAcquireExtBufFunc = nullptr;
     ReleaseExtBufFunc mReleaseExtBufFunc = nullptr;
+
+    std::shared_ptr<ICallback> mCallback;
+    std::mutex mExtBufLock;
 };
 
 class C2AllocationGBM : public C2GraphicAllocation {
@@ -274,7 +287,7 @@ public:
 
     C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferPool> &pool, uint32_t width, uint32_t height,
             uint32_t format, C2MemoryUsage usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle = nullptr,
-            ReleaseExtBufFunc releaseExtBufFunc = nullptr);
+            ReleaseExtBufFunc releaseExtBufFunc = nullptr, std::shared_ptr<C2AllocatorGBM::ICallback> cb = nullptr);
 
     c2_status_t status() const { return mRet; };
 
@@ -291,6 +304,7 @@ private:
     c2_status_t mRet;
     ReleaseExtBufFunc mReleaseExtBufFunc;
     bool mIsFromRemote;
+    std::shared_ptr<C2AllocatorGBM::ICallback> mCallback;
 };
 
 } // namespace android
