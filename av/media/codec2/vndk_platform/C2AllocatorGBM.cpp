@@ -715,7 +715,7 @@ C2AllocatorGBM::C2AllocatorGBM(id_t id)
     mTraits = std::make_shared<Traits>(traits);
 
     mDevice_fd = open("/dev/dri/renderD128", O_RDWR | O_CLOEXEC);
-
+    ALOGI("C2AllocatorGBM constructor(%u) open gbm dev node, ret fd %d", (unsigned int)id, mDevice_fd);
     if (mDevice_fd < 0) {
         int e = errno;
         ALOGE("opening dri device for gbm failed, errno %d(%s)", e, strerror(e));
@@ -756,11 +756,13 @@ C2AllocatorGBM::~C2AllocatorGBM()
     mExternalBufferList.clear();
 
     if (mGBM) {
+        ALOGI("Destroy gbm device: %p", mGBM);
         GbmLib::sFuncGbmDeviceDestroy(mGBM);
         mGBM = NULL;
     }
 
     if (mDevice_fd > 0) {
+        ALOGI("C2AllocatorGBM destructor close gbm dev node fd %d", mDevice_fd);
         close(mDevice_fd);
         mDevice_fd = INVALID_FD;
     }
