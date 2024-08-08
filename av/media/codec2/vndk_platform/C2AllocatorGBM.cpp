@@ -542,7 +542,7 @@ C2AllocationGBM::C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferP
         ReleaseExtBufFunc releaseExtBufFunc, std::shared_ptr<C2AllocatorGBM::ICallback> cb)
     : C2GraphicAllocation(width, height), mHandle(handle), mBufEntryInfo(nullptr), mBase(nullptr),
     mMapSize(0), mPool(pool), mAllocatorId(allocatorId), mRet(C2_OK), mReleaseExtBufFunc(releaseExtBufFunc),
-    mIsFromRemote(false), mCallback(cb)
+    mIsFromRemote(false), mIsToRemote(false), mCallback(cb)
 {
     if (!gbm) {
         ALOGE("Invalid gbm device");
@@ -562,15 +562,18 @@ C2AllocationGBM::~C2AllocationGBM()
     }
 
     if (mHandle) {
-        // only client side handles the ext buffer release
-        // service side will recycle the idx, and allocator will release the fds
-        if (mIsFromRemote && mHandle->mFds.external_fd > 0 && mHandle->mInts.need_free_ext_buf) {
+        // For ext buffer, client side's allocation will be released by downstream component or this dtor.
+        // Usually service side's allocation will not be released in this dtor as client might be using it.
+        // But, if allocations are dropped by service internally (!mIsToRemote), they should be released from dtor.
+        if ((mIsFromRemote || !mIsToRemote) && mHandle->mFds.external_fd > 0 && mHandle->mInts.need_free_ext_buf) {
             if (mCallback) {
                 mCallback->onReleaseExtBuf(mHandle->mInts.idx);
             } else if (mReleaseExtBufFunc) {
                 mReleaseExtBufFunc(mHandle->mFds.external_fd);
             }
         }
+        // only client side handles the ext buffer release
+        // service side will recycle the idx, and allocator will release the fds
         if (mIsFromRemote) {
             uint64_t bo = mHandle->mInts.bo_lo | (uint64_t(mHandle->mInts.bo_hi) << 32);
             GbmLib::sFuncGbmBoDestory ((struct gbm_bo *)bo);
@@ -985,7 +988,7 @@ c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
         ALOGE("Failed to new C2AllocationGBM");
         return ret;
     } else {
-        alloc->setRemote();
+        alloc->fromRemote();
         allocation->reset(alloc);
     }
 
