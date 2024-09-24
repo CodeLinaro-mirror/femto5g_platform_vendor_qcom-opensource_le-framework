@@ -178,6 +178,11 @@ typedef struct ExtraData {
     uint32_t need_free_ext_buf;
     // idx identifies the external buf transfering through binder
     int32_t  idx;
+    // release external buffer callback function pointer used by c2-client
+    uint32_t func_lo;
+    uint32_t func_hi;
+    uint32_t comp_lo;
+    uint32_t comp_hi;
 } ExtraData;
 
 class C2HandleGBM : public C2Handle {
@@ -186,7 +191,8 @@ public:
     static bool isValid(const C2Handle * const o);
     static const C2HandleGBM* Import(const C2Handle *const handle,
             uint32_t *width, uint32_t *height, uint32_t *format,
-            uint64_t *usage, uint32_t *stride, uint32_t *size, uint64_t *bo);
+            uint64_t *usage, uint32_t *stride, uint32_t *size, uint64_t *bo,
+            uint64_t *func = nullptr, uint64_t *comp = nullptr);
     static const ExtraData* getExtraData(const C2Handle *const handle);
 
     GbmBuf mFds;
@@ -250,6 +256,7 @@ public:
     };
 
     c2_status_t setCallback(std::shared_ptr<ICallback> cb);
+    c2_status_t passReleaseExtBufCb(uintptr_t func, uintptr_t comp);
 
 private:
     c2_status_t mInit;
@@ -266,6 +273,8 @@ private:
 
     std::shared_ptr<ICallback> mCallback;
     std::mutex mExtBufLock;
+    uintptr_t mReleaseExtFunc = 0;
+    uintptr_t mComponent = 0;
 };
 
 class C2AllocationGBM : public C2GraphicAllocation {
@@ -291,7 +300,14 @@ public:
 
     c2_status_t status() const { return mRet; };
 
-    void setRemote() {mIsFromRemote = true;}
+    void fromRemote() {
+        mIsFromRemote = true;
+        mIsToRemote = false;
+    }
+    void toRemote() {
+        mIsToRemote = true;
+        mIsFromRemote = false;
+    }
 private:
     c2_status_t Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, C2MemoryUsage usage);
 
@@ -304,6 +320,7 @@ private:
     c2_status_t mRet;
     ReleaseExtBufFunc mReleaseExtBufFunc;
     bool mIsFromRemote;
+    bool mIsToRemote;
     std::shared_ptr<C2AllocatorGBM::ICallback> mCallback;
 };
 

@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
-// Changes from Qualcomm Innovation Center are provided under the following license:
-// Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+// Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+// Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
 // SPDX-License-Identifier: BSD-3-Clause-Clear
+//#define LOG_NDEBUG 0
+#define LOG_TAG "C2Store"
+#include <utils/Log.h>
 
 #include <C2Component.h>
 #include <mutex>
@@ -266,6 +269,7 @@ public:
 #endif
     }
 
+private:
     c2_status_t _createBlockPool(
             C2PlatformAllocatorStore::id_t allocatorId,
             std::shared_ptr<const C2Component> component,
@@ -275,29 +279,40 @@ public:
         std::shared_ptr<C2Allocator> allocator;
         c2_status_t res = C2_NOT_FOUND;
 
+        auto deleter = [this, poolId](C2BlockPool *pool) {
+            std::unique_lock lock(mMutex);
+            mBlockPools.erase(poolId);
+            mBlockAllocators.erase(poolId);
+            mComponents.erase(poolId);
+            ALOGI("blockPool-cache index-clean: pool-id:%d", poolId);
+            delete pool;
+        };
+
         switch(allocatorId) {
             case C2AllocatorStore::DEFAULT_LINEAR:
                 res = allocatorStore->fetchAllocator(
                         C2AllocatorStore::DEFAULT_LINEAR, &allocator);
                 if (res == C2_OK) {
-                    std::shared_ptr<C2BlockPool> ptr =
-                        std::make_shared<C2PooledLinearBlockPool>(allocator, poolId);
+                    std::shared_ptr<C2BlockPool> ptr(
+                            new C2PooledLinearBlockPool(allocator, poolId), deleter);
                     *pool = ptr;
                     mBlockPools[poolId] = ptr;
                     mBlockAllocators[poolId] = allocator;
                     mComponents[poolId] = component;
+                    ALOGI("create linear blockPool-cache done. id:%d", poolId);
                 }
                 break;
             case C2AllocatorStore::DEFAULT_GRAPHIC:
                 res = allocatorStore->fetchAllocator(
                         C2AllocatorStore::DEFAULT_GRAPHIC, &allocator);
                 if (res == C2_OK) {
-                    std::shared_ptr<C2BlockPool> ptr =
-                        std::make_shared<C2PooledGraphicBlockPool>(allocator, poolId);
+                    std::shared_ptr<C2BlockPool> ptr(
+                            new C2PooledGraphicBlockPool(allocator, poolId), deleter);
                     *pool = ptr;
                     mBlockPools[poolId] = ptr;
                     mBlockAllocators[poolId] = allocator;
                     mComponents[poolId] = component;
+                    ALOGI("create graphic blockPool-cache done. id:%d", poolId);
                 }
                 break;
             default:
@@ -306,10 +321,12 @@ public:
         return res;
     }
 
+public:
     c2_status_t createBlockPool(
             C2PlatformAllocatorStore::id_t allocatorId,
             std::shared_ptr<const C2Component> component,
             std::shared_ptr<C2BlockPool> *pool) {
+        std::unique_lock lock(mMutex);
         return _createBlockPool(allocatorId, component, mBlockPoolSeqId++, pool);
     }
 
@@ -317,6 +334,7 @@ public:
             C2BlockPool::local_id_t blockPoolId,
             std::shared_ptr<const C2Component> component,
             std::shared_ptr<C2BlockPool> *pool) {
+        std::unique_lock lock(mMutex);
         // TODO: use one iterator for multiple blockpool type scalability.
         std::shared_ptr<C2BlockPool> ptr;
         auto it = mBlockPools.find(blockPoolId);
@@ -342,6 +360,7 @@ public:
             std::shared_ptr<const C2Component> component,
             std::shared_ptr<C2BlockPool> *pool,
             std::shared_ptr<C2Allocator> *allocator) {
+        std::unique_lock lock(mMutex);
         // TODO: use one iterator for multiple blockpool type scalability.
         bool ret = false;
         std::shared_ptr<C2BlockPool> ptr;
@@ -386,6 +405,9 @@ public:
 
 private:
     C2BlockPool::local_id_t mBlockPoolSeqId;
+    // Deleter needs to hold this mutex, and there is a small chance that deleter
+    // is invoked while the mutex is held.
+    std::recursive_mutex mMutex;
 
     std::map<C2BlockPool::local_id_t, std::weak_ptr<C2BlockPool>> mBlockPools;
     std::map<C2BlockPool::local_id_t, std::weak_ptr<C2Allocator>> mBlockAllocators;
@@ -394,7 +416,6 @@ private:
 
 static std::unique_ptr<_C2BlockPoolCache> sBlockPoolCache =
     std::make_unique<_C2BlockPoolCache>();
-static std::mutex sBlockPoolCacheMutex;
 
 } // anynymous namespace
 
@@ -404,7 +425,6 @@ c2_status_t GetCodec2BlockPool(
         C2BlockPool::local_id_t id, std::shared_ptr<const C2Component> component,
         std::shared_ptr<C2BlockPool> *pool) {
     pool->reset();
-    std::lock_guard<std::mutex> lock(sBlockPoolCacheMutex);
     std::shared_ptr<C2PlatformAllocatorStore> allocatorStore(new C2PlatformAllocatorStoreImpl);
     std::shared_ptr<C2Allocator> allocator;
     c2_status_t res = C2_NOT_FOUND;
@@ -440,7 +460,6 @@ c2_status_t CreateCodec2BlockPool(
         std::shared_ptr<C2BlockPool> *pool) {
     pool->reset();
 
-    std::lock_guard<std::mutex> lock(sBlockPoolCacheMutex);
     return sBlockPoolCache->createBlockPool(allocatorId, component, pool);
 }
 
@@ -448,7 +467,6 @@ c2_status_t GetCodec2BlockPoolWithAllocator(
         C2BlockPool::local_id_t id, std::shared_ptr<const C2Component> component,
         std::shared_ptr<C2BlockPool> *pool, std::shared_ptr<C2Allocator> *c2Allocator) {
     pool->reset();
-    std::lock_guard<std::mutex> lock(sBlockPoolCacheMutex);
     std::shared_ptr<C2PlatformAllocatorStore> allocatorStore(new C2PlatformAllocatorStoreImpl);
     std::shared_ptr<C2Allocator> allocator;
     c2_status_t res = C2_NOT_FOUND;

@@ -255,7 +255,8 @@ private:
 };
 
 // Caller needs to free handle properly when handle is not used any more
-static c2_status_t createC2HandleGBM(C2Handle *&handle, std::shared_ptr<BufferEntryInfo> &entry, uint64_t usage)
+static c2_status_t createC2HandleGBM(C2Handle *&handle, std::shared_ptr<BufferEntryInfo> &entry, uint64_t usage,
+        uintptr_t func = 0, uintptr_t comp = 0)
 {
     c2_status_t ret = C2_OK;
     C2HandleGBM *handleGBM = nullptr;
@@ -285,6 +286,11 @@ static c2_status_t createC2HandleGBM(C2Handle *&handle, std::shared_ptr<BufferEn
             handleGBM->mInts.bo_hi = (uint32_t)(((uint64_t)bo >> 32) & 0xFFFFFFFF);
             handleGBM->mInts.need_free_ext_buf = 1;
             handleGBM->mInts.idx = entry->idx;
+            // save the callback function address
+            handleGBM->mInts.func_lo = (uint32_t)((uint64_t)func & 0xFFFFFFFF);
+            handleGBM->mInts.func_hi = (uint32_t)(((uint64_t)func >> 32) & 0xFFFFFFFF);
+            handleGBM->mInts.comp_lo = (uint32_t)((uint64_t)comp & 0xFFFFFFFF);
+            handleGBM->mInts.comp_hi = (uint32_t)(((uint64_t)comp >> 32) & 0xFFFFFFFF);
 
             ALOGD("GBM handle data: fd:%d meta_fd:%d ext_fd:%d width:%u height:%u format:0x%x "
                     "C2&GBM usage_lo:0x%x usage_hi:0x%x stride:%u slice_height:%u size:%u, bo:0x%" PRIx64,
@@ -511,7 +517,8 @@ const ExtraData* C2HandleGBM::getExtraData(const C2Handle *const handle) {
 const C2HandleGBM* C2HandleGBM::Import(
         const C2Handle *const handle,
         uint32_t *width, uint32_t *height, uint32_t *format,
-        uint64_t *usage, uint32_t *stride, uint32_t *size, uint64_t *bo)
+        uint64_t *usage, uint32_t *stride, uint32_t *size,
+        uint64_t *bo, uint64_t *func, uint64_t *comp)
 {
     const ExtraData *xd = getExtraData(handle);
     if (xd == nullptr) {
@@ -532,6 +539,10 @@ const C2HandleGBM* C2HandleGBM::Import(
         *size = xd->size;
     if (bo)
         *bo = xd->bo_lo | (uint64_t(xd->bo_hi) << 32);
+    if (func)
+        *func = xd->func_lo | (uint64_t(xd->func_hi) << 32);
+    if (comp)
+        *comp = xd->comp_lo | (uint64_t(xd->comp_hi) << 32);
 
     return reinterpret_cast<const C2HandleGBM *>(handle);
 }
@@ -542,7 +553,7 @@ C2AllocationGBM::C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferP
         ReleaseExtBufFunc releaseExtBufFunc, std::shared_ptr<C2AllocatorGBM::ICallback> cb)
     : C2GraphicAllocation(width, height), mHandle(handle), mBufEntryInfo(nullptr), mBase(nullptr),
     mMapSize(0), mPool(pool), mAllocatorId(allocatorId), mRet(C2_OK), mReleaseExtBufFunc(releaseExtBufFunc),
-    mIsFromRemote(false), mCallback(cb)
+    mIsFromRemote(false), mIsToRemote(false), mCallback(cb)
 {
     if (!gbm) {
         ALOGE("Invalid gbm device");
@@ -562,15 +573,21 @@ C2AllocationGBM::~C2AllocationGBM()
     }
 
     if (mHandle) {
-        // only client side handles the ext buffer release
-        // service side will recycle the idx, and allocator will release the fds
-        if (mIsFromRemote && mHandle->mFds.external_fd > 0 && mHandle->mInts.need_free_ext_buf) {
+        // For ext buffer, client side's allocation will be released by downstream component or this dtor.
+        // Usually service side's allocation will not be released in this dtor as client might be using it.
+        // But, if allocations are dropped by service internally (!mIsToRemote), they should be released from dtor.
+        if ((mIsFromRemote || !mIsToRemote) && mHandle->mFds.external_fd > 0 && mHandle->mInts.need_free_ext_buf) {
             if (mCallback) {
                 mCallback->onReleaseExtBuf(mHandle->mInts.idx);
             } else if (mReleaseExtBufFunc) {
-                mReleaseExtBufFunc(mHandle->mFds.external_fd);
+                // Only external buffer cases can be here. For C2service scenario, only decoder case
+                // can be here and mIsFromRemote is true in client side so that we use idx.
+                // For non-C2service scenario, mIsFromRemote is always false so that we use external_fd
+                mReleaseExtBufFunc(mIsFromRemote ? mHandle->mInts.idx : mHandle->mFds.external_fd);
             }
         }
+        // only client side handles the ext buffer release
+        // service side will recycle the idx, and allocator will release the fds
         if (mIsFromRemote) {
             uint64_t bo = mHandle->mInts.bo_lo | (uint64_t(mHandle->mInts.bo_hi) << 32);
             GbmLib::sFuncGbmBoDestory ((struct gbm_bo *)bo);
@@ -940,6 +957,8 @@ c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
     uint32_t stride = 0;
     uint32_t size = 0;
     uint64_t bo = 0;
+    uint64_t func = 0;
+    uint64_t comp = 0;
 
     if (mInit != C2_OK) {
         ALOGE("GBM device is not created, unexpected");
@@ -947,7 +966,7 @@ c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
     }
 
     C2HandleGBM *gbmHandle = const_cast<C2HandleGBM*>(C2HandleGBM::Import(
-        handle, &width, &height, &format, &usage, &stride, &size, &bo));
+        handle, &width, &height, &format, &usage, &stride, &size, &bo, &func, &comp));
     if (gbmHandle == nullptr) {
         ALOGE("Failed to import C2HandleGBM for handle=%p", handle);
         return ret;
@@ -955,9 +974,10 @@ c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
     C2MemoryUsageGBM usages(usage);
 
     ALOGD("GBM handle: fd:%d meta_fd:%d ext_fd:%d width:%u height:%u "
-        "format:%x stride:%u slice_height:%u size:%u usage64:0x%" PRIx64 " bo:0x%" PRIx64,
+        "format:%x stride:%u slice_height:%u size:%u usage64:0x%" PRIx64 " bo:0x%" PRIx64
+        " func:0x%" PRIx64 " comp:0x%" PRIx64,
         gbmHandle->mFds.buffer_fd, gbmHandle->mFds.meta_buffer_fd, gbmHandle->mFds.external_fd,
-        width, height, format, stride, gbmHandle->mInts.slice_height, size, usage, bo);
+        width, height, format, stride, gbmHandle->mInts.slice_height, size, usage, bo, func, comp);
 
     struct gbm_buf_info buf_info;
     buf_info.fd = handle->data[0];
@@ -979,13 +999,19 @@ c2_status_t C2AllocatorGBM::rebuildAllocationGBM(
     gbmHandle->mInts.bo_hi = (uint32_t)(((uint64_t)gbmBo >> 32) & 0xFFFFFFFF);
     ALOGD("GBM imported bo:0x%" PRIx64, (uint64_t)gbmBo);
 
+    ReleaseExtBufFunc releaseFunc = nullptr;
+    if ((0 != func) && (0 != comp)) {
+        using ReleaseCb = void (*) (void*, int32_t);
+        releaseFunc = std::bind((ReleaseCb)func, (void*)comp, std::placeholders::_1);
+    }
+
     auto alloc = new C2AllocationGBM(mGBM, mPool, width, height, format, usages,
-                                     mTraits->id, gbmHandle);
+                                     mTraits->id, gbmHandle, releaseFunc);
     if (alloc == nullptr) {
         ALOGE("Failed to new C2AllocationGBM");
         return ret;
     } else {
-        alloc->setRemote();
+        alloc->fromRemote();
         allocation->reset(alloc);
     }
 
@@ -997,6 +1023,14 @@ c2_status_t C2AllocatorGBM::setCallback(std::shared_ptr<ICallback> cb)
 {
     ALOGI("%s mUseExternalBuffer:%s", __func__, mUseExternalBuffer ? "YES" : "NO");
     mCallback = cb;
+
+    return C2_OK;
+}
+
+c2_status_t C2AllocatorGBM::passReleaseExtBufCb(uintptr_t func, uintptr_t comp) {
+    ALOGI("passReleaseExtBufCb func:0x%" PRIx64 " comp:0x%" PRIx64, func, comp);
+    mReleaseExtFunc = func;
+    mComponent = comp;
 
     return C2_OK;
 }
@@ -1067,7 +1101,7 @@ c2_status_t C2AllocatorGBM::createC2HandleOfExtBuf(C2Handle *&handle,
         }
 
         if (ret == C2_OK) {
-            ret = createC2HandleGBM(handle, *itr, usage.expected);
+            ret = createC2HandleGBM(handle, *itr, usage.expected, mReleaseExtFunc, mComponent);
             if (ret != C2_OK) {
                 ALOGE("Failed to create C2 handle from gbm bo");
             }
