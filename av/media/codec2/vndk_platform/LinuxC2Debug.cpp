@@ -32,12 +32,13 @@
 
 #include "linux-C2Debug-log.h"
 
-#include <iostream>
+//#include <iostream>
 #include <sstream>
 #include <ostream>
 #include <vector>
 #include <syslog.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 uint32_t gC2VndkLogLevel = DEBUG_INFO;
 static C2DebugLevel sC2DebugLevel;

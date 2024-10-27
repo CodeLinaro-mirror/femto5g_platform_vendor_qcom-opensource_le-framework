@@ -17,6 +17,8 @@
 #ifndef C2BUFFER_BASE_H_
 #define C2BUFFER_BASE_H_
 
+#include <stdint.h>
+
 /// \defgroup allocator Allocation and memory placement
 /// @{
 
