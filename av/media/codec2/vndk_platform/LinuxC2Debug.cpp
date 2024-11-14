@@ -39,9 +39,37 @@
 #include <syslog.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <cutils/properties.h>
 
 uint32_t gC2VndkLogLevel = DEBUG_INFO;
 static C2DebugLevel sC2DebugLevel;
+
+static const char *kDebugLogsLevelProperty = "vendor.vndk.log.msg";
+
+static uint32_t getLogLevel(uint32_t defaultLevel, int base) {
+    char value[PROPERTY_VALUE_MAX] = {0};
+
+    // some impl of property_get will not handle the 3rd params
+    if (property_get(kDebugLogsLevelProperty, value, nullptr) <= 0) {
+        return defaultLevel;
+    } else {
+        size_t pos = 0;
+        return std::stoul(value, &pos, base);
+    }
+}
+
+void updateLogLevel() {
+    char debugLevel[32] = {0};
+    char *str = getenv("C2_VNDK_LOG");
+    if (str) {
+        snprintf(debugLevel, sizeof(debugLevel), "%s", str);
+        gC2VndkLogLevel = strtoul(debugLevel, NULL, 0);
+    }
+
+    gC2VndkLogLevel = getLogLevel(gC2VndkLogLevel, 16);
+
+    syslog(LOG_NOTICE, "C2 vndk debug level updated to %u", gC2VndkLogLevel);
+}
 
 // enum DEBUG_LEVEL severity to syslog level
 static const int SEVERITY_TO_LEVEL[] = { LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_NOTICE, LOG_DEBUG };
@@ -49,13 +77,7 @@ static const int SEVERITY_TO_LEVEL[] = { LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_N
 static const char SEVERITY_TO_CHAR[] = { 'E', 'W', 'I', 'D', 'V' };
 
 C2DebugLevel::C2DebugLevel() {
-  char debugLevel[32] = {0};
-  char *str = getenv("C2_VNDK_LOG");
-  if (str) {
-    snprintf(debugLevel, sizeof(debugLevel), "%s", str);
-    gC2VndkLogLevel = strtoul(debugLevel, NULL, 0);
-    //std::cout << "C2 vndk debug level " << gC2VndkLogLevel << std::endl;
-  }
+    updateLogLevel();
 };
 
 void LogMessage::Flush() {

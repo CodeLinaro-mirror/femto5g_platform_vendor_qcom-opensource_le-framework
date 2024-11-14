@@ -40,6 +40,8 @@
 #include <dlfcn.h>
 #endif
 
+#include <C2Debug.h>
+
 namespace android {
 
 
@@ -459,7 +461,7 @@ c2_status_t CreateCodec2BlockPool(
         std::shared_ptr<const C2Component> component,
         std::shared_ptr<C2BlockPool> *pool) {
     pool->reset();
-
+    updateLogLevel();
     return sBlockPoolCache->createBlockPool(allocatorId, component, pool);
 }
 
