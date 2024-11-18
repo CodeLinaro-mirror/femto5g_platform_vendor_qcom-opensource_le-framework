@@ -20,6 +20,7 @@
 #include <errno.h>
 
 #include <string>
+#include <stdint.h>
 
 #ifndef __unused
 #define __unused __attribute__((__unused__))
