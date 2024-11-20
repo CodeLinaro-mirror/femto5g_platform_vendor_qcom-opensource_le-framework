@@ -214,5 +214,7 @@ extern void __c2_vndk_log(int level, const char *fmt, ...);
 #define ALOGW(fmt, args...) __C2_LOG(DEBUG_WARNING, fmt, ##args)
 #define ALOGE(fmt, args...) __C2_LOG(DEBUG_ERROR, fmt, ##args)
 
+void updateLogLevel();
+
 #endif  // C2_HOST_DEBUG_LOG_H_
 
