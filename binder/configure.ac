@@ -44,6 +44,12 @@ if test "x$with_core_includes" != "xno"; then
      AC_SUBST(core_incdir,${core_incdir})
 fi
 
+AC_ARG_WITH([rootprefix],
+    [AS_HELP_STRING([--with-rootprefix=DIR], [Set the root prefix directory])],
+    [rootprefix=$withval],
+    [rootprefix=""])
+AC_SUBST([rootprefix])
+
 AC_ARG_WITH([glib],
       AS_HELP_STRING([--with-glib],
          [enable glib, building HLOS systems which use glib]))
@@ -68,6 +74,9 @@ AC_ARG_WITH(systemd,
         [SYSTEMD="no"])
 
 AM_CONDITIONAL([USE_SYSTEMD], [test "x${SYSTEMD}" != "xno"])
+
+AC_CHECK_FUNCS([strlcat])
+AM_CONDITIONAL(USE_G_STRLCAT, [test  "$ac_cv_func_strlcat" = "no"])
 
 AC_SUBST([CFLAGS])
 AC_SUBST([CPPFLAGS])
