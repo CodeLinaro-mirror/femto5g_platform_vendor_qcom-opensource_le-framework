@@ -1871,6 +1871,11 @@ typedef enum {
     AUDIO_MICROPHONE_LOCATION_CNT = 4,
 } audio_microphone_location_t;
 
+typedef enum {
+    AUDIO_LATENCY_MODE_FREE = 0,
+    AUDIO_LATENCY_MODE_LOW = 1,
+} audio_latency_mode_t;
+
 /* An number to indicate which group the microphone locate. Main body is
  * usually group 0. Developer could use this value to group the microphones
  * that locate on the same peripheral or attachments.
