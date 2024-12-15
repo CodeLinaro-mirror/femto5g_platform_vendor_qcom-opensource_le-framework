@@ -367,6 +367,10 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, u
     // If there's a resolution change, destory related
     // gbm buffer and erase it from the buffer list.
     if (res_fmt_id != mCurResFmtId) {
+        uint32_t old_f = (uint32_t)((mCurResFmtId >> 32) & 0xffffffff);
+        uint32_t old_w = (uint32_t)((mCurResFmtId >> 16) & 0xffff);
+        uint32_t old_h = (uint32_t)(mCurResFmtId & 0xffff);
+        ALOGI("acquire gbm buf meet resolution change: fmt 0x%x, %u x %u -> fmt 0x%x, %u x %u", old_f, old_w, old_h, format, width, height);
         while (itr != mBufferList.end()) {
             // Don't free the gbm buffer be still used by display.
             // It should be freed in releaseBuffer once buffer is not used by display any more.
