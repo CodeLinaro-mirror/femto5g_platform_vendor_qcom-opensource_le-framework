@@ -163,10 +163,11 @@ static GbmLib gbmLib;
 #define _print_buf_entry(level, str, entry, pool)                            \
 do {                                                                         \
     if (entry != nullptr) {                                                  \
-        __C2_LOG(level, "%s entry:%p bo:%p used:%d fd:%u meta_fd:%u"         \
-            " format:0x%x wxh:%ux%u expired:%u pool:%p\n",                   \
+        __C2_LOG(level, "%s entry:%p bo:%p used:%u fd:%d meta_fd:%d"         \
+            " ext_fd:%d idx:%d format:0x%x wxh:%ux%u expired:%u pool:%p\n",  \
             str, (entry).get(), (entry)->bo, (entry)->used, (entry)->bo_fd,  \
-            (entry)->meta_fd, (uint32_t)((entry)->res_fmt_id >> 32),         \
+            (entry)->meta_fd, (entry)->ext_fd, (entry)->idx,                 \
+            (uint32_t)((entry)->res_fmt_id >> 32),                           \
             (uint32_t)(((entry)->res_fmt_id >> 16) & 0xFFFF),                \
             (uint32_t)((entry)->res_fmt_id & 0xFFFF), (entry)->expired,      \
             (pool));                                                         \
@@ -178,14 +179,6 @@ do {                                                                         \
 
 #define _print_buf_entry_d(str, entry, pool) \
     _print_buf_entry(DEBUG_DEBUG, str, entry, pool)
-
-
-static inline void close_fd(int fd)
-{
-    if (fd >= 0) {
-        close(fd);
-    }
-}
 
 // GPU doesn't support those formats below as rendering target.
 // 1. GBM_FORMAT_P010
@@ -372,7 +365,7 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, u
             // It should be freed in releaseBuffer once buffer is not used by display any more.
             if ((*itr)->used == false) {
                 _print_buf_entry_i("finalize", *itr, this);
-                close_fd((*itr)->bo_fd);
+                C2Debug_close_fd((*itr)->bo_fd);
                 GbmLib::sFuncGbmBoDestory((*itr)->bo);
                 itr = mBufferList.erase(itr);
             } else {
@@ -467,7 +460,7 @@ c2_status_t BufferPool::releaseBuffer(std::shared_ptr<BufferEntryInfo> entry)
                     entry->used = false;
                     if (getBufferCountOfCurResFmt() > mTotalBufferCount) {
                         _print_buf_entry_i("decrease", *itr, this);
-                        close_fd((*itr)->bo_fd);
+                        C2Debug_close_fd((*itr)->bo_fd);
                         GbmLib::sFuncGbmBoDestory((*itr)->bo);
                         itr = mBufferList.erase(itr);
                         ALOGD("buffer list size:%zu after decreased", mBufferList.size());
@@ -475,7 +468,7 @@ c2_status_t BufferPool::releaseBuffer(std::shared_ptr<BufferEntryInfo> entry)
                 } else {
                     // destory old buffer once reconfig
                     _print_buf_entry_i("finalize", *itr, this);
-                    close_fd((*itr)->bo_fd);
+                    C2Debug_close_fd((*itr)->bo_fd);
                     GbmLib::sFuncGbmBoDestory((*itr)->bo);
                     itr = mBufferList.erase(itr);
                     ALOGD("release buffer list size:%zu", mBufferList.size());
@@ -639,7 +632,7 @@ c2_status_t C2AllocationGBM::Alloc(struct gbm_device *gbm, uint32_t w, uint32_t 
                     GbmLib::sFuncGbmPerform(GBM_PERFORM_GET_METADATA_ION_FD, bo, &meta_fd);
                     if (meta_fd < 0) {
                         ALOGE("Get bo meta fd failed");
-                        close_fd(bo_fd);
+                        C2Debug_close_fd(bo_fd);
                         GbmLib::sFuncGbmBoDestory(bo);
                         ret = C2_BAD_VALUE;
                     } else {
@@ -752,7 +745,7 @@ C2AllocatorGBM::~C2AllocatorGBM()
     ALOGI("destroy C2AllocatorGBM !");
     for (auto const& i: mPool->mBufferList) {
         if (i->bo) {
-            close_fd(i->bo_fd);
+            C2Debug_close_fd(i->bo_fd);
             GbmLib::sFuncGbmBoDestory (i->bo);
             _print_buf_entry_i("finalize", i, mPool.get());
         }
@@ -761,11 +754,9 @@ C2AllocatorGBM::~C2AllocatorGBM()
 
     for (auto const& i: mExternalBufferList) {
         if (i->bo) {
-            close_fd(i->bo_fd);
-#ifdef USE_AGL_C2SERVICE
-            // In non-c2service scenario, ext_fd is closed by the owner of ext buf
-            close_fd(i->ext_fd);
-#endif
+            C2Debug_close_fd(i->bo_fd);
+            // close fd dup-ed in C2AllocatorGBM::attachExternalFd
+            C2Debug_close_fd(i->ext_fd);
             GbmLib::sFuncGbmBoDestory (i->bo);
             _print_buf_entry_i("ext gbm finalize", i, nullptr);
         }
@@ -778,9 +769,9 @@ C2AllocatorGBM::~C2AllocatorGBM()
         mGBM = NULL;
     }
 
-    if (mDevice_fd > 0) {
+    if (mDevice_fd >= 0) {
         ALOGI("C2AllocatorGBM destructor close gbm dev node fd %d", mDevice_fd);
-        close(mDevice_fd);
+        C2Debug_close_fd(mDevice_fd);
         mDevice_fd = INVALID_FD;
     }
 
@@ -924,20 +915,17 @@ c2_status_t C2AllocatorGBM::attachExternalFd(int extFd, int idx)
 #endif
             (*itr)->used = false;
             found = true;
-#ifdef USE_AGL_C2SERVICE
-            // close the extFd, use the cached fd instead
-            close(extFd);
-#endif
             break;
         } else {
             ++itr;
         }
     }
     if (!found) {
+        int dupFd = dup(extFd);
         std::shared_ptr<BufferEntryInfo> buffer =
-            std::make_shared<BufferEntryInfo>(false, 0, nullptr, INVALID_FD, INVALID_FD, extFd, idx);
+            std::make_shared<BufferEntryInfo>(false, 0, nullptr, INVALID_FD, INVALID_FD, dupFd, idx);
         mExternalBufferList.push_back(buffer);
-        ALOGD("Add new external entry to buffer list with external fd=%d", extFd);
+        ALOGD("Added new entry of external fd=%d, dupFd=%d, idx=%d", extFd, dupFd, idx);
     }
 
     return C2_OK;
@@ -1151,12 +1139,12 @@ c2_status_t C2AllocatorGBM::acquireExtBuffer(uint32_t width, uint32_t height, bo
         auto itr = mExternalBufferList.begin();
         while (itr != mExternalBufferList.end()) {
             if ((*itr)->bo && (*itr)->expired) {
-                close_fd((*itr)->bo_fd);
+                ALOGI("As resolution change, will close bo_fd %d, ext_fd %d", (*itr)->bo_fd, (*itr)->ext_fd);
+                C2Debug_close_fd((*itr)->bo_fd);
                 GbmLib::sFuncGbmBoDestory((*itr)->bo);
                 (*itr)->bo = nullptr;
-#ifdef USE_AGL_C2SERVICE
-                close_fd((*itr)->ext_fd);
-#endif
+                // close fd dup-ed in C2AllocatorGBM::attachExternalFd
+                C2Debug_close_fd((*itr)->ext_fd);
                 itr = mExternalBufferList.erase(itr);
             } else {
                 ++itr;
