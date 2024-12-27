@@ -286,7 +286,7 @@ bool DmaBufferPool::allocateBuffer(std::shared_ptr<C2DmaHandle> &handle,
                 mMaxBufferSize = size;
         } else {
             ALOGE("null handle, fd:%d", fd);
-            close (fd);
+            C2Debug_close_fd(fd);
             ret = false;
         }
     }
