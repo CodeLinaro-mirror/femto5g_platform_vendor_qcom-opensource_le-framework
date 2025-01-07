@@ -72,6 +72,11 @@ static bool check_mac_perms(pid_t spid, const char *tctx, const char *perm, cons
         return false;
     }
 
+    if (sctx == NULL) {
+        ALOGE("Pointer sctx is NULL.\n");
+        return false;
+    }
+
     int result = selinux_check_access(sctx, tctx, class, perm, (void *) name);
     allowed = (result == 0);
 
