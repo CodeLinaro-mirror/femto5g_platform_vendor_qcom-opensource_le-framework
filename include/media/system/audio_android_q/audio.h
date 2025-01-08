@@ -1533,6 +1533,11 @@ typedef enum {
     AUDIO_MICROPHONE_DIRECTIONALITY_CNT = 6,
 } audio_microphone_directionality_t;
 
+typedef enum {
+    AUDIO_LATENCY_MODE_FREE = 0,
+    AUDIO_LATENCY_MODE_LOW = 1,
+} audio_latency_mode_t;
+
 /* A 3D point which could be used to represent geometric location
  * or orientation of a microphone.
  */
