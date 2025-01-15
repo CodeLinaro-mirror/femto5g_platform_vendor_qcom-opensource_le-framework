@@ -1,4 +1,4 @@
-root_libdir = "/lib"
+root_libdir = "@rootprefix@/lib"
 root_etcdir = "/etc"
 
 AM_CPPFLAGS = -I.
