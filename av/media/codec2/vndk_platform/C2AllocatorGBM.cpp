@@ -360,6 +360,10 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, u
     // If there's a resolution change, destory related
     // gbm buffer and erase it from the buffer list.
     if (res_fmt_id != mCurResFmtId) {
+        uint32_t old_f = (uint32_t)((mCurResFmtId >> 32) & 0xffffffff);
+        uint32_t old_w = (uint32_t)((mCurResFmtId >> 16) & 0xffff);
+        uint32_t old_h = (uint32_t)(mCurResFmtId & 0xffff);
+        ALOGI("acquire gbm buf meet resolution change: fmt 0x%x, %u x %u -> fmt 0x%x, %u x %u", old_f, old_w, old_h, format, width, height);
         while (itr != mBufferList.end()) {
             // Don't free the gbm buffer be still used by display.
             // It should be freed in releaseBuffer once buffer is not used by display any more.
@@ -670,7 +674,7 @@ c2_status_t C2AllocationGBM::map(C2Rect rect, C2MemoryUsage usage,
     mBase = mmap(NULL, size, PROT_READ|PROT_WRITE,
             MAP_SHARED, fd, 0);
     if (mBase == MAP_FAILED) {
-        ALOGE("failed to mmap shmem object, errno = %d", errno);
+        ALOGE("failed to mmap() gbm fd, errno = %d, fd %d, sz %d", errno, fd, size);
         return C2_BAD_VALUE;
     }
 
@@ -687,7 +691,7 @@ c2_status_t C2AllocationGBM::unmap(uint8_t **addr, C2Rect rect, C2Fence *fence)
     ALOGD("unmap gbm buffer addr:%p size:%zu", mBase, mMapSize);
 
     if (ret) {
-        ALOGE("failed to ummap shmem object, errno = %d", errno);
+        ALOGE("failed to munmap() gbm fd, errno = %d, addr %p, sz %zu", errno, mBase, mMapSize);
         return C2_BAD_VALUE;
     } else {
         mBase = NULL;
