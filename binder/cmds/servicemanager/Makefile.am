@@ -10,7 +10,12 @@ servicemanager_CPPFLAGS = -I$(top_srcdir)/include
 if IPC_32BIT
 servicemanager_CPPFLAGS += -DBINDER_IPC_32BIT=1
 endif
-servicemanager_LDFLAGS = -llog -lselinux -lcutils
+servicemanager_LDFLAGS = -llog -lcutils
+
+if SELINUX_ENABLE
+servicemanager_LDFLAGS += -lselinux
+servicemanager_CFLAGS = -DSELINUX_IS_ENABLE
+endif
 
 if USE_SYSTEMD
 binder_systemddir    = $(root_libdir)/systemd/system
