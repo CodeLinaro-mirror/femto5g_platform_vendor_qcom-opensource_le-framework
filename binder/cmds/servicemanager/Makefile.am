@@ -14,7 +14,7 @@ servicemanager_LDFLAGS = -llog -lcutils
 
 if SELINUX_ENABLE
 servicemanager_LDFLAGS += -lselinux
-servicemanager_CFLAGS = -DSELINUX_IS_ENABLE
+servicemanager_CPPFLAGS += -DSELINUX_IS_ENABLE
 endif
 
 if USE_SYSTEMD
