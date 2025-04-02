@@ -28,4 +28,18 @@
 #include <linux-C2Debug-log.h>
 #endif
 
+#include <unistd.h>
+#include <string.h>
+
+// to catch the issue of fd already closed
+#define C2Debug_close_fd(fd) do {                                         \
+    if (fd >= 0) {                                                        \
+        int r = close(fd);                                                \
+        if (r != 0) {                                                     \
+            int e = errno;                                                \
+            ALOGE("close(fd %d), ret %d, error: %s", fd, r, strerror(e)); \
+        }                                                                 \
+    }                                                                     \
+} while (0)
+
 #endif  // C2UTILS_DEBUG_LOG_H_
