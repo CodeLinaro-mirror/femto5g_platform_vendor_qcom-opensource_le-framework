@@ -25,6 +25,7 @@
 
 #include <sys/mman.h>
 #include <unistd.h> // getpagesize, size_t, close, dup
+#include <string.h>
 
 #include <C2AllocatorIon.h>
 #include <C2Buffer.h>
@@ -143,7 +144,7 @@ protected:
         if (mInit != C2_OK) {
             // close ionFd now on error
             if (mIonFd >= 0) {
-                close(mIonFd);
+                C2Debug_close_fd(mIonFd);
                 mIonFd = -1;
             }
             // C2_CHECK(bufferFd < 0);
@@ -248,7 +249,7 @@ public:
         }
 
         if (mMapFd >= 0) {
-            close(mMapFd);
+            C2Debug_close_fd(mMapFd);
             mMapFd = -1;
         }
         if (mInit == C2_OK) {
@@ -258,7 +259,7 @@ public:
             native_handle_close(&mHandle);
         }
         if (mIonFd >= 0) {
-            close(mIonFd);
+            C2Debug_close_fd(mIonFd);
         }
     }
 
@@ -475,7 +476,11 @@ C2AllocatorIon::C2AllocatorIon(id_t id)
 
 C2AllocatorIon::~C2AllocatorIon() {
     if (mInit == C2_OK) {
-        ion_close(mIonFd);
+        int r = ion_close(mIonFd);
+        if (r != 0) {
+            int e = errno;
+            ALOGE("ion_close(mIonFd %d), ret %d, error: %s", mIonFd, r, strerror(e));
+        }
     }
 }
 
