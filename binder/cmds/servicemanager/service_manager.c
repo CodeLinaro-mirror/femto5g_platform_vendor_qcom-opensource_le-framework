@@ -15,6 +15,7 @@
 
 //#include <selinux/android.h>
 #include <selinux/avc.h>
+#include <selinux/label.h>
 
 #include "binder.h"
 
