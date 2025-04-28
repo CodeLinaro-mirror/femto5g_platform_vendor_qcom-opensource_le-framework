@@ -230,7 +230,8 @@ public:
     BufferPool();
     c2_status_t acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, uint32_t width, uint32_t height, uint32_t format);
     c2_status_t setMaxBufferCount(uint32_t size);
-    uint32_t    getMaxBufferCount(void) { return mMaxBufferCount; }
+    // return pool's actual max buffer count to client to allocate as much buffers as possible
+    uint32_t    getMaxBufferCount(void) { return mMaxBufferCount + DEFAULT_EXTEND_POOL_SIZE; }
     c2_status_t releaseBuffer(std::shared_ptr<BufferEntryInfo> entry);
 
     std::list<std::shared_ptr<BufferEntryInfo> > mBufferList; // may include old and new buffer during port reconfig
