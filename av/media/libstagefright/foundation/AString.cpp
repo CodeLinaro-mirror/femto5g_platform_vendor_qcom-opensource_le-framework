@@ -197,6 +197,9 @@ void AString::append(const char *s, size_t size) {
         mAllocSize = (mAllocSize + size + 31) & -32;
         mData = (char *)realloc(mData, mAllocSize);
         CHECK(mData != NULL);
+        if (!mData) {
+            return;
+        }
     }
 
     memcpy(&mData[mSize], s, size);
@@ -301,6 +304,9 @@ void AString::insert(const char *from, size_t size, size_t insertionPos) {
         mAllocSize = (mAllocSize + size + 31) & -32;
         mData = (char *)realloc(mData, mAllocSize);
         CHECK(mData != NULL);
+        if (!mData) {
+            return;
+        }
     }
 
     memmove(&mData[insertionPos + size],

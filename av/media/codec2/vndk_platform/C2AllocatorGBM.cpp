@@ -670,16 +670,21 @@ c2_status_t C2AllocationGBM::map(C2Rect rect, C2MemoryUsage usage,
 {
     int fd = mHandle->mFds.buffer_fd;
     int size = mHandle->mInts.size;
+    uint64_t realUsage = mHandle->mInts.usage_lo | (uint64_t(mHandle->mInts.usage_hi) << 32);
+
+    if (realUsage & C2MemoryUsage::READ_PROTECTED) {
+        return C2_REFUSED;
+    }
 
     mBase = mmap(NULL, size, PROT_READ|PROT_WRITE,
             MAP_SHARED, fd, 0);
     if (mBase == MAP_FAILED) {
-        ALOGE("failed to mmap() gbm fd, errno = %d, fd %d, sz %d", errno, fd, size);
+        ALOGE("failed to mmap() gbm fd, errno = %d, fd %d, sz %d, usage 0x%" PRIx64, errno, fd, size, realUsage);
         return C2_BAD_VALUE;
     }
 
     *addr = (uint8_t*) mBase;
-    ALOGD("mapping gbm fd: %d, size: %d addr:%p", fd, size, *addr);
+    ALOGD("mapping gbm fd: %d, size: %d addr: %p usage: 0x%" PRIx64, fd, size, *addr, realUsage);
     mMapSize = size;
 
     return C2_OK;
