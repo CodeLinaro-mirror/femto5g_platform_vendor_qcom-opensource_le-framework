@@ -341,6 +341,11 @@ void IPCThreadState::disableBackgroundScheduling(bool disable)
     gDisableBackgroundScheduling = disable;
 }
 
+bool IPCThreadState::backgroundSchedulingDisabled()
+{
+    return gDisableBackgroundScheduling;
+}
+
 sp<ProcessState> IPCThreadState::process()
 {
     return mProcess;
