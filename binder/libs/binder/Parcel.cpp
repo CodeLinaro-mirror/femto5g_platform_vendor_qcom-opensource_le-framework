@@ -173,11 +173,9 @@ static void release_object(const sp<ProcessState>& proc,
             return;
         }
         case BINDER_TYPE_WEAK_HANDLE: {
-            const wp<IBinder> b = proc->getWeakProxyForHandle(obj.handle);
-            if (b != NULL && b.get_refs()!= NULL){
-                    b.get_refs()->incWeak(who);
-                    b.get_refs()->decWeak(who);
-                    }
+            wp<IBinder> b = proc->getWeakProxyForHandle(obj.handle);
+            if (b != NULL) b.get_refs()->decWeak(who);
+            b = nullptr;
             return;
         }
         case BINDER_TYPE_FD: {
