@@ -76,6 +76,10 @@ AC_ARG_WITH(systemd,
 
 AM_CONDITIONAL([USE_SYSTEMD], [test "x${SYSTEMD}" != "xno"])
 
+AC_CHECK_FUNCS([strlcat])
+AM_CONDITIONAL(USE_G_STRLCAT, [test "$ac_cv_func_strlcat" = "no"])
+AC_OUTPUT
+
 AC_SUBST([CFLAGS])
 AC_SUBST([CPPFLAGS])
 AC_SUBST([LIBS])
