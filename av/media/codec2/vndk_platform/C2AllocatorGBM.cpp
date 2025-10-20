@@ -412,7 +412,7 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, u
             if (itr == mBufferList.end()) {
                 ALOGD("waiting for buffer, pool:%p", this);
                 if (!mBufCond.wait_for(listLock, mWaitTime, bufSignaledFunc)) {
-                    ALOGD("wait for buffer time out, wait time %d ms, pool:%p", mWaitTime.count(), this);
+                    ALOGD("time out, wait time %d ms, pool:%p", mWaitTime.count(), this);
                     if (mWaitTime < MAX_WAIT_BUF_TIME) {
                         mWaitTime = std::min(++mWaitTimeFactor * BASE_WAIT_BUF_TIME, MAX_WAIT_BUF_TIME);
                         ALOGD("increase wait time to %d ms", mWaitTime.count());
@@ -422,16 +422,18 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry, u
                         mTotalBufferCount++;
                         mExtBufferCount++;
                         createNewEntry = true;
-                        ALOGI("create a exteneded buf since time out");
+                        ALOGI("create an extended buf since time out");
                         break;
                     } else {
-                        ALOGW("Warning: wait idle buf timeout and extend buf cnt(%d)"
-                                " reach limit, pool:%p", mExtBufferCount, this);
+                        ALOGW("Warning: no buf available and extended buf cnt(%d) reach limit, "
+                            "pool:%p, wait time %d ms", mExtBufferCount, this, mWaitTime.count());
                         ret = C2_TIMED_OUT;
                         break;
                     }
                 } else {
                     ALOGD("waited for buffer, pool:%p", this);
+                    mWaitTime = BASE_WAIT_BUF_TIME;
+                    mWaitTimeFactor = 1;
                 }
             }
         }
