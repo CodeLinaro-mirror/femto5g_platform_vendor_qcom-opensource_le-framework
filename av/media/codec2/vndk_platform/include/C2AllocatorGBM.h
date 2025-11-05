@@ -294,7 +294,7 @@ public:
 
     virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
 
-    C2AllocationGBM(struct gbm_device *gbm, std::shared_ptr<BufferPool> &pool, uint32_t width, uint32_t height,
+    C2AllocationGBM(std::shared_ptr<BufferPool> &pool, uint32_t width, uint32_t height,
             uint32_t format, C2MemoryUsage usage, C2Allocator::id_t allocatorId, C2HandleGBM *handle = nullptr,
             ReleaseExtBufFunc releaseExtBufFunc = nullptr, std::shared_ptr<C2AllocatorGBM::ICallback> cb = nullptr);
 
@@ -309,7 +309,7 @@ public:
         mIsFromRemote = false;
     }
 private:
-    c2_status_t Alloc(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t format, C2MemoryUsage usage);
+    c2_status_t Alloc(uint32_t w, uint32_t h, uint32_t format, C2MemoryUsage usage);
 
     C2HandleGBM *mHandle;
     std::shared_ptr<BufferEntryInfo> mBufEntryInfo;
