@@ -474,18 +474,21 @@ c2_status_t BufferPool::acquireBuffer(std::shared_ptr<BufferEntryInfo> &entry,
 
         ALOGD("waiting for buffer, pool:%p", this);
         if (!mBufCond.wait_for(listLock, mWaitTime, bufSignaledFunc)) {
-            ALOGD("time out, wait time %d ms, pool:%p", mWaitTime.count(), this);
-
-            // increase buffer count to make new entry possible
+            // increase buffer count to make new entry if possible
             if (mExtBufferCount < DEFAULT_EXTEND_POOL_SIZE) {
                 mTotalBufferCount++;
                 mExtBufferCount++;
                 createNewEntry = true;
-                ALOGI("create an extended buf since time out, wait time %d ms", mWaitTime.count());
+                ALOGI("create an extended buf, pool:%p, wait time %d ms", this, mWaitTime.count());
             } else {
-                ALOGW("Warning: no buf available and extended buf cnt(%d) reach limit, "
-                    "pool:%p, wait time %d ms", mExtBufferCount, this, mWaitTime.count());
                 ret = C2_TIMED_OUT;
+                if (mWaitTime >= MAX_WAIT_BUF_TIME) {
+                    ALOGW("time out and total buffer reach limit %u (ext %u), pool:%p, wait time "
+                        "%d ms", mTotalBufferCount, mExtBufferCount, this, mWaitTime.count());
+                }else {
+                    ALOGD("time out and total buffer reach limit %u (ext %u), pool:%p, wait time "
+                        "%d ms", mTotalBufferCount, mExtBufferCount, this, mWaitTime.count());
+                }
             }
 
             if (mWaitTime < MAX_WAIT_BUF_TIME) {
@@ -661,7 +664,7 @@ c2_status_t C2AllocationGBM::Alloc(uint32_t w, uint32_t h, uint32_t format, C2Me
 
     ret = mPool->acquireBuffer(mBufEntryInfo, w, h, format, usage);
     if (ret != C2_OK) {
-        ALOGW("acquire buffer time out");
+        ALOGD("acquire buffer time out");
     } else {
         C2Handle* handle = nullptr;
         ALOGD("input usage:0x%" PRIx64 ", C2MemoryUsageGBM usage:0x%" PRIx64,
