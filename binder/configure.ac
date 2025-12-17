@@ -76,6 +76,10 @@ AC_ARG_WITH(systemd,
 
 AM_CONDITIONAL([USE_SYSTEMD], [test "x${SYSTEMD}" != "xno"])
 
+AC_CHECK_FUNCS([strlcat], [STRLCAT=yes], [STRLCAT=no])
+AC_CHECK_FUNCS([strlcpy], [STRLCPY=yes], [STRLCPY=no])
+AM_CONDITIONAL(USE_G_STRLCAT_STRLCPY, [test "x$STRLCPY" = "xno" && test "x$STRLCAT" = "xno"])
+
 AC_SUBST([CFLAGS])
 AC_SUBST([CPPFLAGS])
 AC_SUBST([LIBS])

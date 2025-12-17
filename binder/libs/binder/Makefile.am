@@ -34,8 +34,13 @@ libbinder_la_CPPFLAGS += -DDEBUG_REFS_CALLSTACK_ENABLED=0
 libbinder_la_LDFLAGS   = -llog -lcutils -lpthread -lutils
 
 if USE_GLIB
-libbinder_la_CPPFLAGS  += $(GLIB_CFLAGS) -include glib.h -Dstrlcat=g_strlcat
+libbinder_la_CPPFLAGS  += $(GLIB_CFLAGS) -include glib.h
 libbinder_la_LDFLAGS += $(GLIB_LIBS)
+
+if USE_G_STRLCAT_STRLCPY
+libbinder_la_CPPFLAGS += -Dstrlcat=g_strlcat -Dstrlcpy=g_strlcpy
+endif
+
 endif
 
 # Build binder testapp
