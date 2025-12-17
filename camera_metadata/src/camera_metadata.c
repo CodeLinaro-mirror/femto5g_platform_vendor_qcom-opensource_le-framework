@@ -246,7 +246,14 @@ camera_metadata_t *allocate_copy_camera_metadata_checked(
     }
 
     void *buffer = calloc(1, src_size);
-    memcpy(buffer, src, src_size);
+
+    if (NULL == buffer) {
+        ALOGE("%s: Failed to calloc buffer!", __FUNCTION__);
+        return NULL;
+    }
+    else {
+        memcpy(buffer, src, src_size);
+    }
 
     camera_metadata_t *metadata = (camera_metadata_t*) buffer;
     if (validate_camera_metadata_structure(metadata, &src_size) != OK) {
@@ -366,6 +373,11 @@ camera_metadata_t* copy_camera_metadata(void *dst, size_t dst_size,
 
     camera_metadata_t *metadata =
         place_camera_metadata(dst, dst_size, src->entry_count, src->data_count);
+
+    if (NULL == metadata) {
+        ALOGE("%s: Failed to place camera metadata!", __FUNCTION__);
+        return NULL;
+    }
 
     metadata->flags = src->flags;
     metadata->entry_count = src->entry_count;
