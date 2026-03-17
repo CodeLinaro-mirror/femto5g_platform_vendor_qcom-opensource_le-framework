@@ -1,0 +1,5 @@
+libstagefright-headers (1.0.0) unstable; urgency=medium
+
+  * Converted from RPM spec file.
+
+ -- leiwang <leiwan@qti.qualcomm.com>  Mon, 16 Mar 2026 10:59:33 +0000
