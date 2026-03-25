@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+
+export CPPFLAGS += -I/usr/aosp/system/core/inc
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	autoreconf -if
+	dh_auto_configure -- \
+		--with-glib
+
+override_dh_auto_install:
+	dh_auto_install --destdir=$(CURDIR)/debian/tmp
+
+	# --- binder service files ---
+	install -d $(CURDIR)/debian/tmp/usr/lib/systemd/system
+	install -m 0644 $(CURDIR)/debian/servicemanager.service \
+		$(CURDIR)/debian/tmp/usr/lib/systemd/system/servicemanager.service
+	install -m 0644 $(CURDIR)/debian/create-binder.service \
+		$(CURDIR)/debian/tmp/usr/lib/systemd/system/create-binder.service
+	install -d $(CURDIR)/debian/tmp/usr/lib/systemd/system-preset
+	echo "disable servicemanager.service" > \
+		$(CURDIR)/debian/tmp/usr/lib/systemd/system-preset/98-binder.preset
+	echo "disable create-binder.service" >> \
+		$(CURDIR)/debian/tmp/usr/lib/systemd/system-preset/98-binder.preset
+	rm $(CURDIR)/debian/tmp/usr/lib/*/*.la
+	rm $(CURDIR)/debian/tmp/usr/lib/*/*.a

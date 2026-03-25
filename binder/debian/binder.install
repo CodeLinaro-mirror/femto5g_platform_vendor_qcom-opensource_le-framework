@@ -1,0 +1,5 @@
+usr/bin/servicemanager
+usr/lib/aarch64-linux-gnu/libbinder.so.*
+usr/lib/systemd/system/create-binder.service
+usr/lib/systemd/system/servicemanager.service
+usr/lib/systemd/system-preset/98-binder.preset
