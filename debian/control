@@ -6,16 +6,9 @@ Build-Depends: debhelper-compat (= 13)
 Standards-Version: 4.6.0
 Homepage: http://developer.android.com/
 
-Package: libstagefright-headers
-Architecture: arm64
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: AOSP libstagefright/foundation headers for AOSP ReflectedParamUpdater
- Provide libstagefright/foundation headers introduced by the Android Open
- Source Project, used for query and update C2Params.
-
 Package: libstagefright-headers-dev
 Architecture: arm64
 Section: libdevel
-Depends: ${shlibs:Depends}, ${misc:Depends}, libstagefright-headers(= ${binary:Version})
+Depends: ${misc:Depends}
 Description: AOSP libstagefright/foundation headers for AOSP ReflectedParamUpdater
 
