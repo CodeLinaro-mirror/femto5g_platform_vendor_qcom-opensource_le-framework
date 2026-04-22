@@ -1,0 +1,17 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+[Unit]
+Description= Service manager Service
+After=create-binder.service
+SourcePath=/usr/bin/servicemanager
+
+[Service]
+User=binder
+Group=binder
+Restart=always
+NoNewPrivileges=true
+AmbientCapabilities=CAP_SYS_NICE
+ExecStart=/usr/bin/servicemanager
+
+[Install]
+WantedBy=multi-user.target

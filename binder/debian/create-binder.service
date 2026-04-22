@@ -1,0 +1,19 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
+[Unit]
+Description=Create binderfs related device node for servicemanager
+After=dev-binderfs.mount
+
+[Service]
+User=binder
+Group=binder
+Type=oneshot
+RemainAfterExit=yes
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_FOWNER CAP_DAC_OVERRIDE
+AmbientCapabilities=CAP_FOWNER CAP_DAC_OVERRIDE
+ExecStart=/etc/initscripts/create-binder
+
+[Install]
+WantedBy=sysinit.target

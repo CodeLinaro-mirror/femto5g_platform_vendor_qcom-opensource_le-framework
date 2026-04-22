@@ -1,0 +1,5 @@
+binder (1.0.1) noble; urgency=medium
+
+  * Initial Debian packaging based on binder_git.bb.
+
+ -- Haoran Lu <halu@qti.qualcomm.com>  Tue, 25 Mar 2026 10:00:00 +0000

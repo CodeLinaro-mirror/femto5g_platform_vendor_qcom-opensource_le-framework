@@ -1,0 +1,38 @@
+Source: binder
+Section: misc
+Priority: optional
+Maintainer: Haoran Lu <halu@qti.qualcomm.com>
+Rules-Requires-Root: no
+Build-Depends:
+ autoconf,
+ automake,
+ libtool,
+ gcc,
+ g++,
+ libglib2.0-dev,
+ liblog-dev,
+ libcutils-dev,
+ libutils-dev,
+ aosp-system-core-include-dev,
+ pkgconf | pkg-config,
+ debhelper-compat (= 13)
+Standards-Version: 4.6.2
+
+Package: binder
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: Android Binder IPC support
+ This package contains the servicemanager daemon, libbinder shared library,
+ and related scripts and systemd service files for Android Binder IPC support.
+
+Package: libbinder-dev
+Architecture: any
+Depends: binder (= ${binary:Version}), ${misc:Depends}
+Description: Android Binder IPC development files
+ This package contains the headers and pkg-config file for libbinder.
+
+Package: binder-test
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: Android Binder IPC test binaries
+ This package contains test binaries for the Binder IPC library.
