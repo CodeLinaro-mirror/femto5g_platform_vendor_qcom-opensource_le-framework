@@ -1,0 +1,7 @@
+libcamera-metadata (1.0.0) unstable; urgency=medium
+
+  * Initial release for Ubuntu
+  * Converted from Yocto camera-metadata recipe
+  * Camera Metadata library from AOSP adapted for Qualcomm Linux platform
+
+ -- Wei Mo <wem@qti.qualcomm.com>  Mon, 17 Mar 2026 18:57:00 +0800

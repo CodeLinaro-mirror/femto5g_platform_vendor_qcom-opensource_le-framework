@@ -1,0 +1,7 @@
+usr/lib/aarch64-linux-gnu/libcamera_metadata.so
+usr/lib/aarch64-linux-gnu/libcamera_metadata.a
+usr/lib/aarch64-linux-gnu/libcamera_metadata.la
+usr/include/camera/camera_metadata_hidden.h
+usr/include/system/camera_metadata.h
+usr/include/system/camera_metadata_tags.h
+usr/include/system/camera_vendor_tags.h
