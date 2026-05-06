@@ -50,6 +50,7 @@ struct CryptoPlugin {
         // Neither key nor iv are being used in this mode.
         // Each subsample is encrypted w/ an iv of all zeroes.
         kMode_AES_WV      = 2,  // FIX constant
+        kMode_AES_CBC     = 3,
     };
 
     struct SubSample {
