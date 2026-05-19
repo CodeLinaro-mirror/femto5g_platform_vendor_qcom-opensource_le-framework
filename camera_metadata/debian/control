@@ -1,0 +1,38 @@
+Source: libcamera-metadata
+Section: libs
+Priority: optional
+Maintainer: Wei Mo <wem@qti.qualcomm.com>
+Build-Depends: debhelper-compat (= 13),
+               autoconf,
+               automake,
+               libtool,
+               pkg-config,
+               android-libcutils-dev
+Standards-Version: 4.6.2
+Homepage: https://www.codelinaro.org/
+Rules-Requires-Root: no
+
+Package: libcamera-metadata
+Architecture: arm64
+Multi-Arch: same
+Section: libs
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Camera Metadata library for Qualcomm Linux platform
+ This package provides the Camera Metadata shared library, one of
+ the basic functionalities for the Linux camera framework.
+ .
+ Originally from the Android Open Source Project (AOSP), adapted
+ for the Qualcomm Innovation Center Linux platform.
+
+Package: libcamera-metadata-dev
+Architecture: arm64
+Multi-Arch: same
+Section: libdevel
+Depends: libcamera-metadata (= ${binary:Version}), ${misc:Depends}
+Description: Camera Metadata library - Development files
+ This package provides the Camera Metadata shared library, one of
+ the basic functionalities for the Linux camera framework.
+ .
+ This package contains the development symlink, static library,
+ header files, and libtool .la file necessary for software
+ development against libcamera_metadata.

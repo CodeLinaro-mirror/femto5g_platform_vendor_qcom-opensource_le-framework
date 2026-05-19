@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+# debian/rules for libcamera-metadata
+#
+# Upstream build system : autotools  (configure.ac + Makefile.am + libtool)
+# Yocto equivalent      : inherit autotools pkgconfig  (camera-metadata_1.0.bb)
+# Ubuntu dependency map : libcutils  →  android-libcutils-dev
+#                         cutils headers under /usr/include/android  (not /usr/include)
+
+export DH_VERBOSE = 1
+
+# Ubuntu's android-libcutils-dev installs headers under /usr/include/android,
+# not the bare /usr/include that Yocto assumes.  Pass the extra -I so that
+# #include <cutils/log.h> resolves correctly during the build.
+export CFLAGS   += -I/usr/include/android
+export CPPFLAGS += -I/usr/include/android
+
+%:
+	dh $@
+
+# Run autoreconf explicitly (mirrors Yocto's autotools class behaviour).
+override_dh_autoreconf:
+	autoreconf -vif
+
+# Pass --libdir so the library lands in the multiarch path, and supply the
+# same --with-core-includes that the RPM spec uses.
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--libdir=/usr/lib/aarch64-linux-gnu \
+		--with-core-includes=/usr/include/android
+
+# Produce a proper dbgsym package; announce migration from any legacy -dbg.
+override_dh_strip:
+	dh_strip --dbgsym-migration='libcamera-metadata-dbg (<< 1.0.0~)'
