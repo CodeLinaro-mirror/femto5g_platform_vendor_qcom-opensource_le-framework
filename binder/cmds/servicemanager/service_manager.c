@@ -99,7 +99,7 @@ static bool check_mac_perms_from_getcon(pid_t spid, const char *perm)
 
 static bool check_mac_perms_from_lookup(pid_t spid, const char *perm, const char *name)
 {
-    bool allowed;
+    bool allowed = true;
     char *tctx = NULL;
 
     #ifdef SELINUX_IS_ENABLE
