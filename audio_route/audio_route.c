@@ -490,9 +490,17 @@ static void start_tag(void *data, const XML_Char *tag_name,
 
     else if (strcmp(tag_name, "ctl") == 0) {
         /* Obtain the mixer ctl and value */
+        if (attr_name == NULL) {
+            ALOGE("Control with no name - skipping");
+            goto done;
+        }
         ctl = mixer_get_ctl_by_name(ar->mixer, attr_name);
         if (ctl == NULL) {
             ALOGE("Control '%s' doesn't exist - skipping", attr_name);
+            goto done;
+        }
+        if (attr_value == NULL) {
+            ALOGE("Control '%s' has no value - skipping", attr_name);
             goto done;
         }
 
