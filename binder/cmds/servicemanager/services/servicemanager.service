@@ -33,8 +33,9 @@
 [Unit]
 Description= Service manager Service
 SourcePath=/usr/bin/servicemanager
-After=binderfs.service
-Requires=binderfs.service
+DefaultDependencies=no
+After=dev-binderfs.mount
+Wants=dev-binderfs.mount
 
 [Service]
 User=system
