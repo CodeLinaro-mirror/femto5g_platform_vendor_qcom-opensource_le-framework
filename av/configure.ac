@@ -59,7 +59,6 @@ AC_SUBST([LIBS])
 AC_CONFIG_FILES([ \
         Makefile  \
         camera/Makefile \
-        camera/libcamera_client.pc \
-        media/mtp/Makefile
+        camera/libcamera_client.pc
         ])
 AC_OUTPUT
