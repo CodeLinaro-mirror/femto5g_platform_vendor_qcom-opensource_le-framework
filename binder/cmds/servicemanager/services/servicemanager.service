@@ -35,6 +35,7 @@ Description= Service manager Service
 SourcePath=/usr/bin/servicemanager
 After=binderfs.service
 Requires=binderfs.service
+DefaultDependencies=no
 
 [Service]
 User=system
@@ -43,4 +44,4 @@ Restart=always
 ExecStart=/usr/bin/servicemanager
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=sysinit.target
