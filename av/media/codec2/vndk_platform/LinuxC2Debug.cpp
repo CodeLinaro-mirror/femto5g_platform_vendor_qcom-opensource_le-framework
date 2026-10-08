@@ -86,6 +86,13 @@ void LogMessage::Flush() {
   }
 
   data_->num_chars_to_log_ = data_->stream_.pcount();
+
+  // Avoid underflow when accessing the last character of an empty message.
+  if (data_->num_chars_to_log_ == 0) {
+    data_->has_been_flushed_ = true;
+    return;
+  }
+
   data_->num_chars_to_syslog_ =
     data_->num_chars_to_log_ - data_->num_prefix_chars_;
 
