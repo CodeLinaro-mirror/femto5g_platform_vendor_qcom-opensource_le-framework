@@ -410,6 +410,9 @@ c2_status_t C2DmaLinearAllocation::map(
         ALOGE("null handle");
     } else if (!addr) {
         ALOGE("invalid addr");
+    } else if (offset > capacity() || size > capacity() - offset) {
+        *addr = nullptr;
+        ALOGE("invalid range offset:%zu size:%zu capacity:%u", offset, size, capacity());
     } else {
         if (usage.expected & C2MemoryUsage::CPU_READ) {
             prot |= PROT_READ;
@@ -423,15 +426,21 @@ c2_status_t C2DmaLinearAllocation::map(
             ALOGE("refused to map for secure buffer");
             ret = C2_REFUSED;
         } else {
+            // mmap() needs a page aligned file offset. Map from the page
+            // that holds |offset| and return the address of |offset| itself.
             int fd = mHandle->bufferFd();
-            mBase = mmap(0, size, prot, MAP_SHARED, fd, 0);
+            size_t alignment = sysconf(_SC_PAGESIZE);
+            size_t mapOffset = offset - (offset % alignment);
+            size_t mapSize = size + (offset - mapOffset);
+            mBase = mmap(0, mapSize, prot, MAP_SHARED, fd, mapOffset);
             if (mBase == MAP_FAILED) {
                 mBase = *addr = nullptr;
                 ret = C2_CANNOT_DO;
-                ALOGE("mmap error fd:%d size:%zu prot:%x", fd, size, prot);
+                ALOGE("mmap error fd:%d offset:%zu size:%zu prot:%x",
+                      fd, mapOffset, mapSize, prot);
             } else {
-                *addr = mBase;
-                mMapSize = size;
+                *addr = (uint8_t *)mBase + (offset - mapOffset);
+                mMapSize = mapSize;
                 ret = C2_OK;
             }
         }
