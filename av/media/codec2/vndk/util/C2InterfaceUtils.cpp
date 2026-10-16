@@ -19,8 +19,6 @@
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wunused-value"
 
-#define C2_LOG_VERBOSE
-
 #include <C2Debug.h>
 #include <C2Param.h>
 #include <C2ParamDef.h>
