@@ -60,6 +60,7 @@
 // Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
 // SPDX-License-Identifier: BSD-3-Clause-Clear
 
+#include <cstdint>
 #include <iostream>
 #include <mutex>
 
@@ -179,7 +180,31 @@ enum DEBUG_LEVEL {
 #define SYSLOG_FATAL()      SYSLOG_ERROR()
 #define SYSLOG(severity)    SYSLOG_ ## severity().stream()
 
-#define C2_LOG(LEVEL) SYSLOG(LEVEL)
+extern uint32_t gC2VndkLogLevel;
+
+// FATAL is logged as ERROR (see SYSLOG_FATAL).
+#define C2_LOG_LEVEL_ERROR      DEBUG_ERROR
+#define C2_LOG_LEVEL_WARNING    DEBUG_WARNING
+#define C2_LOG_LEVEL_INFO       DEBUG_INFO
+#define C2_LOG_LEVEL_DEBUG      DEBUG_DEBUG
+#define C2_LOG_LEVEL_VERBOSE    DEBUG_VERBOSE
+#define C2_LOG_LEVEL_FATAL      DEBUG_ERROR
+
+// Turns the ostream& from the << chain into void so both ?: arms match.
+// & is used because it groups after << but before ?:.
+class LogMessageVoidify {
+    public:
+        LogMessageVoidify() = default;
+        void operator&(std::ostream&) {}
+};
+
+// Skip building the message (and evaluating its arguments) when it
+// would not be emitted. An expression, not an if, so it cannot capture
+// a trailing else.
+#define C2_LOG(LEVEL)                                                 \
+    (gC2VndkLogLevel < static_cast<uint32_t>(C2_LOG_LEVEL_ ## LEVEL)) \
+        ? static_cast<void>(0)                                        \
+        : LogMessageVoidify() & SYSLOG(LEVEL)
 
 class C2DebugLevel {
     public:
