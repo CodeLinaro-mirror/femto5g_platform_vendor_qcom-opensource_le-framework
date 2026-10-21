@@ -115,6 +115,7 @@ sp<IBinder> ProcessState::getContextObject(const String16& name, const sp<IBinde
     }
     
     IPCThreadState* ipc = IPCThreadState::self();
+    if (ipc == NULL) return NULL;
     {
         Parcel data, reply;
         // no interface token on this magic transaction
@@ -214,7 +215,9 @@ sp<IBinder> ProcessState::getStrongProxyForHandle(int32_t handle)
                 // proper reference counting.
 
                 Parcel data;
-                status_t status = IPCThreadState::self()->transact(
+                IPCThreadState* ipcSelf = IPCThreadState::self();
+                if (ipcSelf == NULL) return NULL;
+                status_t status = ipcSelf->transact(
                         0, IBinder::PING_TRANSACTION, data, NULL, 0);
                 if (status == DEAD_OBJECT)
                    return NULL;
