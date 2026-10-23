@@ -81,6 +81,7 @@ bool PermissionCache::checkCallingPermission(const String16& permission) {
 bool PermissionCache::checkCallingPermission(
         const String16& permission, int32_t* outPid, int32_t* outUid) {
     IPCThreadState* ipcState = IPCThreadState::self();
+    if (ipcState == NULL) return false;
     pid_t pid = ipcState->getCallingPid();
     uid_t uid = ipcState->getCallingUid();
     if (outPid) *outPid = pid;

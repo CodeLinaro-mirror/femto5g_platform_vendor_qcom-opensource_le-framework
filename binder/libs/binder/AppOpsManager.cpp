@@ -44,7 +44,8 @@ sp<IAppOpsService> AppOpsManager::getService()
     int64_t startTime = 0;
     mLock.lock();
     sp<IAppOpsService> service = mService;
-    while (service == NULL || !IInterface::asBinder(service)->isBinderAlive()) {
+    while (service == NULL || IInterface::asBinder(service) == NULL ||
+           !IInterface::asBinder(service)->isBinderAlive()) {
         sp<IBinder> binder = defaultServiceManager()->checkService(_appops);
         if (binder == NULL) {
             // Wait for the app ops service to come back...
@@ -53,6 +54,7 @@ sp<IAppOpsService> AppOpsManager::getService()
                 ALOGI("Waiting for app ops service");
             } else if ((uptimeMillis()-startTime) > 10000) {
                 ALOGW("Waiting too long for app ops service, giving up");
+                mLock.unlock();
                 return NULL;
             }
             sleep(1);

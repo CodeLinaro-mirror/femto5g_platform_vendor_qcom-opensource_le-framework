@@ -168,8 +168,12 @@ static void release_object(const sp<ProcessState>& proc,
             return;
         }
         case BINDER_TYPE_WEAK_HANDLE: {
-            const wp<IBinder> b = proc->getWeakProxyForHandle(obj.handle);
-            if (b != NULL) b.get_refs()->decWeak(who);
+            wp<IBinder> b = proc->getWeakProxyForHandle(obj.handle);
+            if (b != NULL) {
+                RefBase::weakref_type* refs = b.get_refs();
+                b = wp<IBinder>();  // release b's hold; disarms destructor
+                refs->decWeak(who);
+            }
             return;
         }
         case BINDER_TYPE_FD: {
@@ -581,7 +585,9 @@ bool Parcel::hasFileDescriptors() const
 // Write RPC headers.  (previously just the interface token)
 status_t Parcel::writeInterfaceToken(const String16& interface)
 {
-    writeInt32(IPCThreadState::self()->getStrictModePolicy() |
+    IPCThreadState* ipc = IPCThreadState::self();
+    if (ipc == NULL) return NO_INIT;
+    writeInt32(ipc->getStrictModePolicy() |
                STRICT_MODE_PENALTY_GATHER);
     // currently the interface identification token is just its name as a string
     return writeString16(interface);
@@ -598,6 +604,7 @@ bool Parcel::enforceInterface(const String16& interface,
     int32_t strictPolicy = readInt32();
     if (threadState == NULL) {
         threadState = IPCThreadState::self();
+        if (threadState == NULL) return false;
     }
     if ((threadState->getLastTransactionBinderFlags() &
          IBinder::FLAG_ONEWAY) != 0) {
@@ -1051,6 +1058,7 @@ restart_write:
 
         // Need to write meta-data?
         if (nullMetaData || val.binder != 0) {
+            if (mObjects == NULL) return NO_MEMORY;
             mObjects[mObjectsSize] = mDataPos;
             acquire_object(ProcessState::self(), val, this, &mOpenAshmemSize);
             mObjectsSize++;
