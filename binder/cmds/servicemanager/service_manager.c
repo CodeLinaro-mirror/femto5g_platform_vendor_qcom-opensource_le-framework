@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <selinux/label.h>
 
 #include <cutils/multiuser.h>
 
@@ -17,6 +16,7 @@
 #ifdef SELINUX_IS_ENABLE
 //#include <selinux/android.h>
 #include <selinux/avc.h>
+#include <selinux/label.h>
 #endif
 
 #include "binder.h"
