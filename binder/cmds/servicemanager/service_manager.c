@@ -14,7 +14,9 @@
 #include <private/android_filesystem_config.h>
 
 //#include <selinux/android.h>
+#ifdef SELINUX_POLICY
 #include <selinux/avc.h>
+#endif
 
 #include "binder.h"
 
@@ -25,8 +27,10 @@
 #define LOG_TAG "ServiceManager"
 #include <cutils/log.h>
 #endif
+#ifdef SELINUX_POLICY
 int selabel_lookup(struct selabel_handle *hnd, security_context_t *context, const char *key, int type);
 void selabel_close(struct selabel_handle *hnd);
+#endif
 
 const char *str8(const uint16_t *x, size_t x_len)
 {
@@ -61,6 +65,7 @@ static int selinux_enabled;
 static char *service_manager_context;
 static struct selabel_handle* sehandle;
 
+#ifdef SELINUX_POLICY
 static bool check_mac_perms(pid_t spid, const char *tctx, const char *perm, const char *name)
 {
     char *sctx = NULL;
@@ -134,6 +139,17 @@ static int svc_can_find(const uint16_t *name, size_t name_len, pid_t spid)
     const char *perm = "find";
     return check_mac_perms_from_lookup(spid, perm, str8(name, name_len)) ? 1 : 0;
 }
+#else
+static int svc_can_register(const uint16_t *name, size_t name_len, pid_t spid, uid_t uid)
+{
+    if (multiuser_get_app_id(uid) >= AID_APP) {
+        return 0;
+    }
+    return 1;
+}
+static int svc_can_list(pid_t spid) { (void)spid; return 1; }
+static int svc_can_find(const uint16_t *name, size_t name_len, pid_t spid) { (void)name; (void)name_len; (void)spid; return 1; }
+#endif
 
 struct svcinfo
 {
@@ -288,6 +304,7 @@ int svcmgr_handler(struct binder_state *bs,
         return -1;
     }
 
+#ifdef SELINUX_POLICY
     if (sehandle && selinux_status_updated() > 0) {
         struct selabel_handle *tmp_sehandle = NULL;// = selinux_android_service_context_handle();
         if (tmp_sehandle) {
@@ -295,6 +312,7 @@ int svcmgr_handler(struct binder_state *bs,
             sehandle = tmp_sehandle;
         }
     }
+#endif
 
     switch(txn->code) {
     case SVC_MGR_GET_SERVICE:
@@ -348,11 +366,13 @@ int svcmgr_handler(struct binder_state *bs,
 }
 
 
+#ifdef SELINUX_POLICY
 static int audit_callback(void *data, security_class_t cls, char *buf, size_t len)
 {
     snprintf(buf, len, "service=%s", !data ? "NULL" : (char *)data);
     return 0;
 }
+#endif
 
 int main(int argc, char **argv)
 {
@@ -371,6 +391,7 @@ int main(int argc, char **argv)
 
 //    selinux_enabled = is_selinux_enabled();
 
+#ifdef SELINUX_POLICY
     if (selinux_enabled > 0) {
 //        sehandle = selinux_android_service_context_handle();
         selinux_status_open(true);
@@ -390,6 +411,7 @@ int main(int argc, char **argv)
     selinux_set_callback(SELINUX_CB_AUDIT, cb);
     cb.func_log = 0;//selinux_log_callback;
     selinux_set_callback(SELINUX_CB_LOG, cb);
+#endif
 
     binder_loop(bs, svcmgr_handler);
 
