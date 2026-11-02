@@ -58,6 +58,7 @@ static String16 _permission("permission");
 bool checkCallingPermission(const String16& permission, int32_t* outPid, int32_t* outUid)
 {
     IPCThreadState* ipcState = IPCThreadState::self();
+    if (ipcState == NULL) return false;
     pid_t pid = ipcState->getCallingPid();
     uid_t uid = ipcState->getCallingUid();
     if (outPid) *outPid = pid;
@@ -87,7 +88,8 @@ bool checkPermission(const String16& permission, pid_t pid, uid_t uid)
             }
             
             // Is this a permission failure, or did the controller go away?
-            if (IInterface::asBinder(pc)->isBinderAlive()) {
+            sp<IBinder> pcBinder = IInterface::asBinder(pc);
+            if (pcBinder != NULL && pcBinder->isBinderAlive()) {
                 ALOGW("Permission failure: %s from uid=%d pid=%d",
                         String8(permission).string(), uid, pid);
                 return false;
