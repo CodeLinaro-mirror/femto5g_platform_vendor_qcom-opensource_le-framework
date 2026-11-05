@@ -16,6 +16,7 @@
 #ifdef SELINUX_IS_ENABLE
 //#include <selinux/android.h>
 #include <selinux/avc.h>
+#include <selinux/label.h>
 #endif
 
 #include "binder.h"

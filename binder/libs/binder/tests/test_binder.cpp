@@ -235,7 +235,8 @@ int main(int argc, char **argv) {
         defaultServiceManager()->addService(String16("Demo"), new Demo());
         android::ProcessState::self()->startThreadPool();
         INFO("Demo service is added");
-        IPCThreadState::self()->joinThreadPool();
+        IPCThreadState* ipc = IPCThreadState::self();
+        if (ipc != NULL) ipc->joinThreadPool();
         INFO("Demo service thread joined");
     } else if (argc == 2) {
         INFO("We're the client: %s", argv[1]);

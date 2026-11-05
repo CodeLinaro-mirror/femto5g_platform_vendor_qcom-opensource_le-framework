@@ -140,6 +140,7 @@ private:
 void* IMemory::fastPointer(const sp<IBinder>& binder, ssize_t offset) const
 {
     sp<IMemoryHeap> realHeap = BpMemoryHeap::get_heap(binder);
+    if (realHeap == NULL) return 0;
     void* const base = realHeap->base();
     if (base == MAP_FAILED)
         return 0;
@@ -280,6 +281,9 @@ void BpMemoryHeap::assertMapped() const
     if (mHeapId == -1) {
         sp<IBinder> binder(IInterface::asBinder(const_cast<BpMemoryHeap*>(this)));
         sp<BpMemoryHeap> heap(static_cast<BpMemoryHeap*>(find_heap(binder).get()));
+        if (heap == NULL) {
+            return;
+        }
         heap->assertReallyMapped();
         if (heap->mBase != MAP_FAILED) {
             Mutex::Autolock _l(mLock);

@@ -72,6 +72,10 @@ static SNDFILE *sf_open_read(const char *path, SF_INFO *info)
     }
 
     SNDFILE *handle = (SNDFILE *) malloc(sizeof(SNDFILE));
+    if (handle == NULL) {
+        fclose(stream);
+        return NULL;
+    }
     handle->mode = SFM_READ;
     handle->temp = NULL;
     handle->stream = stream;
@@ -366,6 +370,10 @@ static SNDFILE *sf_open_write(const char *path, SF_INFO *info)
     // dataSize is initially zero
     (void) fwrite(wav, 44 + extra, 1, stream);
     SNDFILE *handle = (SNDFILE *) malloc(sizeof(SNDFILE));
+    if (handle == NULL) {
+        fclose(stream);
+        return NULL;
+    }
     handle->mode = SFM_WRITE;
     handle->temp = NULL;
     handle->stream = stream;
@@ -433,6 +441,8 @@ sf_count_t sf_readf_short(SNDFILE *handle, short *ptr, sf_count_t desiredFrames)
     unsigned format = handle->info.format & SF_FORMAT_SUBMASK;
     if (format == SF_FORMAT_PCM_32 || format == SF_FORMAT_FLOAT || format == SF_FORMAT_PCM_24) {
         temp = malloc(desiredBytes);
+        if (temp == NULL)
+            return 0;
         actualBytes = fread(temp, sizeof(char), desiredBytes, handle->stream);
     } else {
         actualBytes = fread(ptr, sizeof(char), desiredBytes, handle->stream);
@@ -482,6 +492,8 @@ sf_count_t sf_readf_float(SNDFILE *handle, float *ptr, sf_count_t desiredFrames)
     unsigned format = handle->info.format & SF_FORMAT_SUBMASK;
     if (format == SF_FORMAT_PCM_16 || format == SF_FORMAT_PCM_U8 || format == SF_FORMAT_PCM_24) {
         temp = malloc(desiredBytes);
+        if (temp == NULL)
+            return 0;
         actualBytes = fread(temp, sizeof(char), desiredBytes, handle->stream);
     } else {
         actualBytes = fread(ptr, sizeof(char), desiredBytes, handle->stream);
@@ -533,6 +545,8 @@ sf_count_t sf_readf_int(SNDFILE *handle, int *ptr, sf_count_t desiredFrames)
     size_t actualBytes;
     if (format == SF_FORMAT_PCM_16 || format == SF_FORMAT_PCM_U8 || format == SF_FORMAT_PCM_24) {
         temp = malloc(desiredBytes);
+        if (temp == NULL)
+            return 0;
         actualBytes = fread(temp, sizeof(char), desiredBytes, handle->stream);
     } else {
         actualBytes = fread(ptr, sizeof(char), desiredBytes, handle->stream);
@@ -577,6 +591,8 @@ sf_count_t sf_writef_short(SNDFILE *handle, const short *ptr, sf_count_t desired
     switch (handle->info.format & SF_FORMAT_SUBMASK) {
     case SF_FORMAT_PCM_U8:
         handle->temp = realloc(handle->temp, desiredBytes);
+        if (handle->temp == NULL)
+            return 0;
         memcpy_to_u8_from_i16(handle->temp, ptr, desiredBytes);
         actualBytes = fwrite(handle->temp, sizeof(char), desiredBytes, handle->stream);
         break;
@@ -586,6 +602,8 @@ sf_count_t sf_writef_short(SNDFILE *handle, const short *ptr, sf_count_t desired
             actualBytes = fwrite(ptr, sizeof(char), desiredBytes, handle->stream);
         } else {
             handle->temp = realloc(handle->temp, desiredBytes);
+            if (handle->temp == NULL)
+                return 0;
             memcpy(handle->temp, ptr, desiredBytes);
             my_swab((short *) handle->temp, desiredFrames * handle->info.channels);
             actualBytes = fwrite(handle->temp, sizeof(char), desiredBytes, handle->stream);
@@ -593,6 +611,8 @@ sf_count_t sf_writef_short(SNDFILE *handle, const short *ptr, sf_count_t desired
         break;
     case SF_FORMAT_FLOAT:
         handle->temp = realloc(handle->temp, desiredBytes);
+        if (handle->temp == NULL)
+            return 0;
         memcpy_to_float_from_i16((float *) handle->temp, ptr,
                 desiredFrames * handle->info.channels);
         actualBytes = fwrite(handle->temp, sizeof(char), desiredBytes, handle->stream);
@@ -617,6 +637,8 @@ sf_count_t sf_writef_float(SNDFILE *handle, const float *ptr, sf_count_t desired
         break;
     case SF_FORMAT_PCM_16:
         handle->temp = realloc(handle->temp, desiredBytes);
+        if (handle->temp == NULL)
+            return 0;
         memcpy_to_i16_from_float((short *) handle->temp, ptr,
                 desiredFrames * handle->info.channels);
         actualBytes = fwrite(handle->temp, sizeof(char), desiredBytes, handle->stream);
