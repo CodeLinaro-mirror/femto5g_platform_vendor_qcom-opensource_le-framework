@@ -26,6 +26,13 @@ AS_CASE([$host],
 
 ARM=yes
 
+AC_ARG_ENABLE([selinux-policy],
+      AS_HELP_STRING([--enable-selinux-policy],
+         [Disable selinux for binder (default: yes)]),
+         [enable_selinux_policy=${enableval}], [enable_selinux_policy="yes"])
+
+AM_CONDITIONAL(ENABLE_SELINUX_POLICY, [test "x${enable_selinux_policy}" = "xyes"])
+
 AC_ARG_ENABLE(32bit-binder-ipc,
       AS_HELP_STRING([--enable-32bit-binder-ipc],
         [enables IPC on 32bit kernel]),
@@ -75,6 +82,10 @@ AC_ARG_WITH(systemd,
         [SYSTEMD="no"])
 
 AM_CONDITIONAL([USE_SYSTEMD], [test "x${SYSTEMD}" != "xno"])
+
+AC_CHECK_FUNCS([strlcat], [STRLCAT=yes], [STRLCAT=no])
+AC_CHECK_FUNCS([strlcpy], [STRLCPY=yes], [STRLCPY=no])
+AM_CONDITIONAL(USE_G_STRLCAT_STRLCPY, [test "x$STRLCPY" = "xno" && test "x$STRLCAT" = "xno"])
 
 AC_SUBST([CFLAGS])
 AC_SUBST([CPPFLAGS])

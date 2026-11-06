@@ -103,7 +103,7 @@ static inline uint8x3_t int32_to_uint8x3(int32_t in) {
     typeof(out_buff) dst_ptr = out_buff + num_out_samples - 1; \
     size_t src_index; \
     typeof(in_buff) src_ptr = in_buff + num_in_samples - 1; \
-    size_t num_zero_chans = out_buff_chans - in_buff_chans - 1; \
+    size_t num_zero_chans = (out_buff_chans - in_buff_chans) > 1 ? out_buff_chans - in_buff_chans - 1: 0; \
     for (src_index = 0; src_index < num_in_samples; src_index += in_buff_chans) { \
         size_t dst_offset; \
         for (dst_offset = 0; dst_offset < num_zero_chans; dst_offset++) { \
