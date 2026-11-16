@@ -161,8 +161,9 @@ status_t BpBinder::transact(
 {
     // Once a binder has died, it will never come back to life.
     if (mAlive) {
-        status_t status = IPCThreadState::self()->transact(
-            mHandle, code, data, reply, flags);
+        IPCThreadState* ipc = IPCThreadState::self();
+        if (ipc == NULL) return DEAD_OBJECT;
+        status_t status = ipc->transact(mHandle, code, data, reply, flags);
         if (status == DEAD_OBJECT) mAlive = 0;
         return status;
     }
@@ -173,7 +174,7 @@ status_t BpBinder::transact(
 status_t BpBinder::linkToDeath(
     const sp<DeathRecipient>& recipient, void* cookie, uint32_t flags)
 {
-    Obituary ob;
+    Obituary ob = {};
     ob.recipient = recipient;
     ob.cookie = cookie;
     ob.flags = flags;
